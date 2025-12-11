@@ -17,7 +17,7 @@ export default function ReportPreview({
   showBiopsyButton
 }) {
   return (
-    <div className={`bg-white w-full max-w-lg h-full max-h-[85vh] shadow-xl rounded-xl flex flex-col overflow-hidden relative transition-all duration-300 ${aiMode ? 'ring-2 ring-indigo-500 shadow-indigo-100' : ''}`}>
+    <div className={`bg-white w-full max-w-3xl h-full max-h-[90vh] shadow-xl rounded-xl flex flex-col overflow-hidden relative transition-all duration-300 ${aiMode ? 'ring-2 ring-indigo-500 shadow-indigo-100' : ''}`}>
       
       {/* Toolbar */}
       <div className="bg-slate-800 text-slate-100 px-4 py-3 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 z-10 shadow-md">

@@ -422,7 +422,7 @@ export default function EndoReport() {
     <TooltipProvider>
       <div className="flex flex-col lg:flex-row h-screen bg-slate-50 text-slate-700">
         {/* LEFT PANEL - FORM */}
-        <div className="w-full lg:w-7/12 h-full overflow-y-auto border-r border-slate-200">
+        <div className="w-full lg:w-1/2 h-full overflow-y-auto border-r border-slate-200">
           <div className="p-6 lg:p-8 max-w-4xl mx-auto">
             
             {/* Header */}
@@ -505,7 +505,7 @@ export default function EndoReport() {
         </div>
 
         {/* RIGHT PANEL - PREVIEW */}
-        <div className="w-full lg:w-5/12 h-full bg-slate-100 p-4 lg:p-6 flex flex-col items-center justify-center border-l border-slate-200">
+        <div className="w-full lg:w-1/2 h-full bg-slate-100 p-4 lg:p-6 flex flex-col items-center justify-center border-l border-slate-200">
           <ReportPreview
             report={report}
             wordCount={wordCount}
