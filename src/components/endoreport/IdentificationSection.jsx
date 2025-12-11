@@ -31,7 +31,27 @@ const INDICACOES = [
   ]},
 ];
 
-export default function IdentificationSection({ paciente, setPaciente, indicacao, setIndicacao }) {
+export default function IdentificationSection({ paciente, setPaciente, indicacao, setIndicacao, customIndications = [] }) {
+  // Merge default and custom indications
+  const allIndications = [...INDICACOES];
+  
+  // Add custom indications to their respective groups or create new groups
+  customIndications.forEach(custom => {
+    const existingGroup = allIndications.find(g => g.group === custom.group);
+    if (existingGroup) {
+      // Check if this indication already exists
+      const exists = existingGroup.options.some(opt => opt.value === custom.value);
+      if (!exists) {
+        existingGroup.options.push({ value: custom.value, label: custom.label });
+      }
+    } else {
+      // Create new group
+      allIndications.push({
+        group: custom.group,
+        options: [{ value: custom.value, label: custom.label }]
+      });
+    }
+  });
   return (
     <div className="bg-white p-4 lg:p-6 rounded-xl border border-slate-200 shadow-sm">
       <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-4">Identificação</h3>
@@ -62,7 +82,7 @@ export default function IdentificationSection({ paciente, setPaciente, indicacao
                 <SelectValue placeholder="Selecione..." />
               </SelectTrigger>
               <SelectContent className="max-h-80">
-                {INDICACOES.map((group) => (
+                {allIndications.map((group) => (
                   <React.Fragment key={group.group}>
                     <div className="px-2 py-1.5 text-xs font-bold text-slate-500 bg-slate-50">{group.group}</div>
                     {group.options.map((opt) => (

@@ -1,4 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { base44 } from '@/api/base44Client';
+import { useQuery } from '@tanstack/react-query';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -10,8 +12,10 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { 
   Stethoscope, User, Trash2, Sparkles, Copy, Check, RotateCcw, 
-  Microscope, Printer, FileText, HelpCircle, Bell, X
+  Microscope, Printer, FileText, HelpCircle, Bell, X, Settings
 } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { createPageUrl } from './utils';
 
 import IdentificationSection from '@/components/endoreport/IdentificationSection';
 import EsophagusSection from '@/components/endoreport/EsophagusSection';
@@ -20,9 +24,23 @@ import DuodenumSection from '@/components/endoreport/DuodenumSection';
 import ReportPreview from '@/components/endoreport/ReportPreview';
 import BiopsyModal from '@/components/endoreport/BiopsyModal';
 
-const DOCTOR_NAME = "Dr(a). Endoscopista - CRM 000000";
-
 export default function EndoReport() {
+  // Fetch settings
+  const { data: settings } = useQuery({
+    queryKey: ['settings'],
+    queryFn: async () => {
+      const result = await base44.entities.Settings.list();
+      if (result && result.length > 0) {
+        return result[0];
+      }
+      return null;
+    }
+  });
+
+  const doctorName = settings?.doctor_name || 'Dr(a). Endoscopista';
+  const doctorCrm = settings?.doctor_crm || 'CRM 000000';
+  const customIndications = settings?.custom_indications || [];
+
   // Identification
   const [paciente, setPaciente] = useState('');
   const [indicacao, setIndicacao] = useState('Dispepsia');
@@ -340,10 +358,10 @@ export default function EndoReport() {
       obs.forEach(o => text += `* ${o}\n`);
     }
 
-    text += `\n\nAssinado eletronicamente por:\n${DOCTOR_NAME}`;
+    text += `\n\nAssinado eletronicamente por:\n${doctorName} - ${doctorCrm}`;
 
     setReport(text);
-  }, [paciente, indicacao, preparoInadequado, esoNormal, esoData, estoNormal, estoData, duoNormal, duoData, aiMode]);
+  }, [paciente, indicacao, preparoInadequado, esoNormal, esoData, estoNormal, estoData, duoNormal, duoData, aiMode, doctorName, doctorCrm]);
 
   useEffect(() => {
     generateReport();
@@ -417,6 +435,12 @@ export default function EndoReport() {
                 <p className="text-sm text-slate-500 font-medium ml-1 mt-1">EndoReport Pro v3.3 By OrensteinAI</p>
               </div>
               <div className="flex items-center gap-3">
+                <Link to={createPageUrl('Settings')}>
+                  <Button variant="ghost" size="sm" className="gap-2 text-slate-500 hover:text-slate-700">
+                    <Settings className="w-4 h-4" />
+                    <span className="hidden sm:inline">Configurações</span>
+                  </Button>
+                </Link>
                 <button 
                   onClick={handleReset}
                   className="text-slate-500 hover:text-red-600 font-medium text-xs flex items-center gap-2 transition-colors px-3 py-2 rounded-lg hover:bg-red-50 border border-transparent hover:border-red-100 group"
@@ -435,6 +459,7 @@ export default function EndoReport() {
                 setPaciente={setPaciente}
                 indicacao={indicacao}
                 setIndicacao={setIndicacao}
+                customIndications={customIndications}
               />
 
               {/* Preparo Note */}
@@ -498,7 +523,7 @@ export default function EndoReport() {
           open={biopsyModalOpen}
           onClose={() => setBiopsyModalOpen(false)}
           paciente={paciente}
-          doctorName={DOCTOR_NAME}
+          doctorName={`${doctorName} - ${doctorCrm}`}
           esoData={esoData}
           estoData={estoData}
           duoData={duoData}
