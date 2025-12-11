@@ -2,7 +2,7 @@ import React from 'react';
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { Sparkles, Copy, Check, RotateCcw, Microscope } from 'lucide-react';
+import { Sparkles, Copy, Check, RotateCcw, Microscope, Save } from 'lucide-react';
 import { motion } from 'framer-motion';
 
 export default function ReportPreview({
@@ -14,7 +14,10 @@ export default function ReportPreview({
   onToggleAI,
   onCopy,
   onOpenBiopsy,
-  showBiopsyButton
+  showBiopsyButton,
+  onSaveReport,
+  saving,
+  hasPatient
 }) {
   return (
     <div className={`bg-white w-full max-w-3xl h-full max-h-[90vh] shadow-xl rounded-xl flex flex-col overflow-hidden relative transition-all duration-300 ${aiMode ? 'ring-2 ring-indigo-500 shadow-indigo-100' : ''}`}>
@@ -40,6 +43,16 @@ export default function ReportPreview({
               <span className="hidden sm:inline">Pedido Biópsia</span>
             </Button>
           )}
+          <Button
+            onClick={onSaveReport}
+            size="sm"
+            disabled={saving || !hasPatient}
+            className="bg-green-600 hover:bg-green-700"
+            title={!hasPatient ? "Selecione um paciente primeiro" : "Salvar laudo"}
+          >
+            <Save className="w-4 h-4 mr-1" />
+            <span className="hidden sm:inline">{saving ? 'Salvando...' : 'Salvar'}</span>
+          </Button>
           <Button
             onClick={onToggleAI}
             size="sm"

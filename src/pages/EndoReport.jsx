@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { base44 } from '@/api/base44Client';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -23,8 +23,12 @@ import StomachSection from '@/components/endoreport/StomachSection';
 import DuodenumSection from '@/components/endoreport/DuodenumSection';
 import ReportPreview from '@/components/endoreport/ReportPreview';
 import BiopsyModal from '@/components/endoreport/BiopsyModal';
+import PatientSelector from '@/components/endoreport/PatientSelector';
 
 export default function EndoReport() {
+  const urlParams = new URLSearchParams(window.location.search);
+  const patientIdFromUrl = urlParams.get('patient_id');
+
   // Fetch settings
   const { data: settings } = useQuery({
     queryKey: ['settings'],
@@ -40,6 +44,26 @@ export default function EndoReport() {
   const doctorName = settings?.doctor_name || 'Dr(a). Endoscopista';
   const doctorCrm = settings?.doctor_crm || 'CRM 000000';
   const customIndications = settings?.custom_indications || [];
+
+  // Patient Management
+  const [selectedPatient, setSelectedPatient] = useState(null);
+
+  // Fetch patient if ID in URL
+  const { data: patientFromUrl } = useQuery({
+    queryKey: ['patient-from-url', patientIdFromUrl],
+    queryFn: async () => {
+      const results = await base44.entities.Patient.filter({ id: patientIdFromUrl });
+      return results[0] || null;
+    },
+    enabled: !!patientIdFromUrl
+  });
+
+  useEffect(() => {
+    if (patientFromUrl && !selectedPatient) {
+      setSelectedPatient(patientFromUrl);
+      setPaciente(patientFromUrl.name);
+    }
+  }, [patientFromUrl]);
 
   // Identification
   const [paciente, setPaciente] = useState('');
@@ -115,6 +139,18 @@ export default function EndoReport() {
   const [copied, setCopied] = useState(false);
   const [biopsyModalOpen, setBiopsyModalOpen] = useState(false);
   const [report, setReport] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  const queryClient = useQueryClient();
+
+  const saveReportMutation = useMutation({
+    mutationFn: (data) => base44.entities.Report.create(data),
+    onSuccess: () => {
+      queryClient.invalidateQueries(['patient-reports']);
+      setSaving(false);
+      alert('Laudo salvo com sucesso!');
+    }
+  });
 
   const checkBiopsyNeeded = useCallback(() => {
     return esoData.barrett || esoData.eosinofilica || esoData.neoplasia ||
@@ -385,6 +421,48 @@ export default function EndoReport() {
     setTimeout(() => setCopied(false), 2000);
   };
 
+  const handleSaveReport = () => {
+    if (!selectedPatient) {
+      alert('Por favor, selecione um paciente antes de salvar o laudo.');
+      return;
+    }
+
+    if (!report.trim()) {
+      alert('O laudo está vazio.');
+      return;
+    }
+
+    const conclusions = [];
+    // Parse conclusions from report
+    const conclusionMatch = report.match(/CONCLUSÃO:\n([\s\S]*?)(?:\n\nCONDUTA|$)/);
+    if (conclusionMatch) {
+      const conclusionText = conclusionMatch[1];
+      const lines = conclusionText.split('\n').filter(l => l.trim());
+      lines.forEach(line => {
+        const cleaned = line.replace(/^\d+\.\s*/, '').trim();
+        if (cleaned) conclusions.push(cleaned);
+      });
+    }
+
+    const reportData = {
+      patient_id: selectedPatient.id,
+      patient_name: selectedPatient.name,
+      indication: indicacao,
+      report_content: report,
+      exam_date: new Date().toISOString().split('T')[0],
+      findings: {
+        esophagus: esoData,
+        stomach: estoData,
+        duodenum: duoData
+      },
+      conclusions: conclusions,
+      biopsy_requested: checkBiopsyNeeded()
+    };
+
+    setSaving(true);
+    saveReportMutation.mutate(reportData);
+  };
+
   const handleReset = () => {
     if (confirm("Deseja iniciar um novo laudo? Todos os dados serão apagados.")) {
       setPaciente('');
@@ -434,11 +512,17 @@ export default function EndoReport() {
                 </h1>
                 <p className="text-sm text-slate-500 font-medium ml-1 mt-1">EndoReport Pro v3.3 By OrensteinAI</p>
               </div>
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2 flex-wrap">
+                <Link to={createPageUrl('Patients')}>
+                  <Button variant="ghost" size="sm" className="gap-2 text-slate-500 hover:text-slate-700">
+                    <Users className="w-4 h-4" />
+                    <span className="hidden sm:inline">Pacientes</span>
+                  </Button>
+                </Link>
                 <Link to={createPageUrl('Settings')}>
                   <Button variant="ghost" size="sm" className="gap-2 text-slate-500 hover:text-slate-700">
                     <Settings className="w-4 h-4" />
-                    <span className="hidden sm:inline">Configurações</span>
+                    <span className="hidden sm:inline">Config</span>
                   </Button>
                 </Link>
                 <button 
@@ -446,14 +530,25 @@ export default function EndoReport() {
                   className="text-slate-500 hover:text-red-600 font-medium text-xs flex items-center gap-2 transition-colors px-3 py-2 rounded-lg hover:bg-red-50 border border-transparent hover:border-red-100 group"
                 >
                   <Trash2 className="w-4 h-4 group-hover:scale-110 transition-transform" />
-                  <span className="hidden sm:inline">Novo Laudo</span>
+                  <span className="hidden sm:inline">Novo</span>
                 </button>
-                <Badge className="bg-sky-100 text-sky-800 border border-sky-200 font-bold">PRO</Badge>
               </div>
             </div>
 
             {/* Form */}
             <div className="space-y-6">
+              <PatientSelector
+                selectedPatient={selectedPatient}
+                onSelectPatient={(patient) => {
+                  setSelectedPatient(patient);
+                  if (patient) {
+                    setPaciente(patient.name);
+                  } else {
+                    setPaciente('');
+                  }
+                }}
+              />
+
               <IdentificationSection
                 paciente={paciente}
                 setPaciente={setPaciente}
@@ -516,6 +611,9 @@ export default function EndoReport() {
             onCopy={handleCopy}
             onOpenBiopsy={() => setBiopsyModalOpen(true)}
             showBiopsyButton={checkBiopsyNeeded()}
+            onSaveReport={handleSaveReport}
+            saving={saving}
+            hasPatient={!!selectedPatient}
           />
         </div>
 
