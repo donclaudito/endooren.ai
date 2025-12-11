@@ -12,7 +12,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { 
   Stethoscope, User, Trash2, Sparkles, Copy, Check, RotateCcw, 
-  Microscope, Printer, FileText, HelpCircle, Bell, X, Settings
+  Microscope, Printer, FileText, HelpCircle, Bell, X, Settings, Users
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { createPageUrl } from '../utils';
