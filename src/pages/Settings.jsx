@@ -9,7 +9,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Settings as SettingsIcon, User, FileText, Trash2, Plus, Save, ArrowLeft, CheckCircle } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { createPageUrl } from './utils';
+import { createPageUrl } from '../utils';
 
 import DoctorSettings from '@/components/settings/DoctorSettings';
 import IndicationsSettings from '@/components/settings/IndicationsSettings';

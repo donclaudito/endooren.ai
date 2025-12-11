@@ -15,7 +15,7 @@ import {
   Microscope, Printer, FileText, HelpCircle, Bell, X, Settings
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { createPageUrl } from './utils';
+import { createPageUrl } from '../utils';
 
 import IdentificationSection from '@/components/endoreport/IdentificationSection';
 import EsophagusSection from '@/components/endoreport/EsophagusSection';
