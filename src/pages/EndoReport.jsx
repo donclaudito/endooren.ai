@@ -506,7 +506,7 @@ export default function EndoReport() {
             {/* Header */}
             <div className="flex items-center justify-between mb-8 pb-4 border-b border-slate-200">
               <div>
-                <h1 className="text-2xl lg:text-3xl font-bold text-slate-800 tracking-tight flex items-center gap-3">EndoO
+                <h1 className="text-2xl lg:text-3xl font-bold text-slate-800 tracking-tight flex items-center gap-3">EndoOren.A
 
 
                 </h1>
