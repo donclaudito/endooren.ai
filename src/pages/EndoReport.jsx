@@ -508,7 +508,7 @@ export default function EndoReport() {
               <div>
                 <h1 className="text-2xl lg:text-3xl font-bold text-slate-800 tracking-tight flex items-center gap-3">
                   <FileText className="w-7 h-7 text-sky-600" />
-                  EndoReport
+                  Endo OREN.AI
                 </h1>
                 <p className="text-sm text-slate-500 font-medium ml-1 mt-1">EndoReport Pro v3.3 By OrensteinAI</p>
               </div>
