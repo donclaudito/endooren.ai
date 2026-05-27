@@ -10,10 +10,10 @@ import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { 
-  Stethoscope, User, Trash2, Sparkles, Copy, Check, RotateCcw, 
-  Microscope, Printer, FileText, HelpCircle, Bell, X, Settings, Users
-} from 'lucide-react';
+import {
+  Stethoscope, User, Trash2, Sparkles, Copy, Check, RotateCcw,
+  Microscope, Printer, FileText, HelpCircle, Bell, X, Settings, Users } from
+'lucide-react';
 import { Link } from 'react-router-dom';
 import { createPageUrl } from '../utils';
 
@@ -154,12 +154,12 @@ export default function EndoReport() {
 
   const checkBiopsyNeeded = useCallback(() => {
     return esoData.barrett || esoData.eosinofilica || esoData.neoplasia ||
-           estoData.neoplasia || estoData.sydney || duoData.celiaca || estoData.polipo;
+    estoData.neoplasia || estoData.sydney || duoData.celiaca || estoData.polipo;
   }, [esoData, estoData, duoData]);
 
   const generateReport = useCallback(() => {
     let text = "";
-    
+
     // Header
     if (paciente) text += `PACIENTE: ${paciente.toUpperCase()}\n`;
     text += `INDICAÇÃO: ${indicacao}\n`;
@@ -177,12 +177,12 @@ export default function EndoReport() {
     // ESÔFAGO
     text += `ESÔFAGO:\n`;
     if (esoNormal) {
-      text += aiMode ? 
-        `Introdução do aparelho sob visão direta. Esôfago de calibre, distensibilidade e trajeto anatômicos preservados. Mucosa de coloração rósea, brilho e relevo habituais, livre de lesões focais ou difusas. Transição esofagogástrica coincidente com o pinçamento diafragmático.\n` :
-        `Calibre e distensibilidade preservados. Mucosa de aspecto normal, sem lesões. Transição esofagogástrica coincidente com o pinçamento diafragmático.\n`;
+      text += aiMode ?
+      `Introdução do aparelho sob visão direta. Esôfago de calibre, distensibilidade e trajeto anatômicos preservados. Mucosa de coloração rósea, brilho e relevo habituais, livre de lesões focais ou difusas. Transição esofagogástrica coincidente com o pinçamento diafragmático.\n` :
+      `Calibre e distensibilidade preservados. Mucosa de aspecto normal, sem lesões. Transição esofagogástrica coincidente com o pinçamento diafragmático.\n`;
     } else {
       let e_txt = aiMode ? "Esôfago com calibre e distensibilidade preservados (salvo se descrito abaixo). " : "Calibre preservado. ";
-      
+
       if (esoData.neoplasia) {
         if (aiMode) {
           e_txt += `\nIdentifica-se lesão tumoral de crescimento ${esoData.neoTipo}, localizada em ${esoData.neoLocal}, de consistência endurecida e friável ao toque do aparelho. A lesão ocupa mais de 50% da circunferência do órgão${esoData.neoEstenose ? " e determina estenose do lúmen, dificultando a progressão do aparelho" : ", sem determinar estenose significativa"}. `;
@@ -195,7 +195,7 @@ export default function EndoReport() {
 
       if (esoData.esofagite) {
         const grau = esoData.grauEsofagite;
-        let desc = (grau === 'A' || grau === 'B') ? "erosões não confluentes" : "erosões confluentes";
+        let desc = grau === 'A' || grau === 'B' ? "erosões não confluentes" : "erosões confluentes";
         if (aiMode) {
           e_txt += `Observam-se soluções de continuidade na mucosa (erosões) ${desc} no terço distal, compatíveis com Esofagite de Refluxo (Classificação de Los Angeles grau ${grau}). `;
         } else {
@@ -214,7 +214,7 @@ export default function EndoReport() {
       }
 
       if (esoData.varizes) {
-        let cal_txt = esoData.varizesCalibre === 'fino' ? "fino calibre" : (esoData.varizesCalibre === 'medio' ? "médio calibre" : "grosso calibre");
+        let cal_txt = esoData.varizesCalibre === 'fino' ? "fino calibre" : esoData.varizesCalibre === 'medio' ? "médio calibre" : "grosso calibre";
         if (aiMode) {
           e_txt += `\nIdentificam-se cordões varicosos de ${cal_txt} no terço distal/médio do esôfago, que ${esoData.varizesCalibre === 'fino' ? "desaparecem" : "não desaparecem totalmente"} à insuflação. ${esoData.varizesRedSpots ? "Presença de sinais vermelhos (red spots)." : "Ausência de sinais vermelhos."} `;
         } else {
@@ -272,9 +272,9 @@ export default function EndoReport() {
     // ESTÔMAGO
     text += `\nESTÔMAGO:\n`;
     if (estoNormal) {
-      text += aiMode ? 
-        `Estômago com boa expansibilidade à insuflação. Lago mucoso claro e em quantidade habitual. Mucosa de fundo, corpo e antro com aspecto íntegro. Manobra de retrovisão sem alterações. Piloro centrado.\n` :
-        `Lago mucoso claro. Fundo, corpo e antro com mucosa íntegra. Retrovisão sem alterações. Piloro permeável.\n`;
+      text += aiMode ?
+      `Estômago com boa expansibilidade à insuflação. Lago mucoso claro e em quantidade habitual. Mucosa de fundo, corpo e antro com aspecto íntegro. Manobra de retrovisão sem alterações. Piloro centrado.\n` :
+      `Lago mucoso claro. Fundo, corpo e antro com mucosa íntegra. Retrovisão sem alterações. Piloro permeável.\n`;
     } else {
       let s_txt = aiMode ? "Lago mucoso de aspecto habitual. " : "Lago mucoso claro. ";
 
@@ -288,7 +288,7 @@ export default function EndoReport() {
         obs.push("Realizadas múltiplas biópsias da lesão gástrica.");
       }
 
-      if (!estoData.atrofia || (estoData.atrofia && estoData.gastriteTipo !== 'Enantematosa')) {
+      if (!estoData.atrofia || estoData.atrofia && estoData.gastriteTipo !== 'Enantematosa') {
         if (aiMode) {
           s_txt += `Mucosa de ${estoData.gastriteLocal} exibindo hiperemia difusa de padrão ${estoData.gastriteTipo.toLowerCase()}, de intensidade ${estoData.gastriteIntensidade.toLowerCase()}. `;
         } else {
@@ -344,9 +344,9 @@ export default function EndoReport() {
     // DUODENO
     text += `\nDUODENO:\n`;
     if (duoNormal) {
-      text += aiMode ? 
-        `Bulbo duodenal amplo. Segunda porção duodenal com pregueado de Kerckring preservado e papila de aspecto macroscópico habitual.\n` :
-        `Bulbo e segunda porção sem alterações.\n`;
+      text += aiMode ?
+      `Bulbo duodenal amplo. Segunda porção duodenal com pregueado de Kerckring preservado e papila de aspecto macroscópico habitual.\n` :
+      `Bulbo e segunda porção sem alterações.\n`;
     } else {
       let d_txt = "";
       if (duoData.duodenite) {
@@ -363,11 +363,11 @@ export default function EndoReport() {
         if (duoData.celAtrofia) achadosCel.push("atrofia de vilosidades");
         if (duoData.celMosaico) achadosCel.push("aspecto em mosaico");
         if (duoData.celSerrilhado) achadosCel.push("serrilhado de pregas");
-        
-        let descCel = achadosCel.length > 0 ? achadosCel.join(", ") : (aiMode ? "redução do pregueado, serrilhado e mosaico" : "sinais de atrofia vilositária");
-        
+
+        let descCel = achadosCel.length > 0 ? achadosCel.join(", ") : aiMode ? "redução do pregueado, serrilhado e mosaico" : "sinais de atrofia vilositária";
+
         d_txt += aiMode ? `\nSegunda porção duodenal apresentando ${descCel}. ` : `\nPresença de ${descCel} na segunda porção duodenal. `;
-        
+
         conclusao.push("Sinais endoscópicos sugestivos de atrofia vilositária (Suspeita de Doença Celíaca)");
         obs.push("Realizadas biópsias de segunda porção duodenal para investigação de enteropatia.");
       }
@@ -384,14 +384,14 @@ export default function EndoReport() {
     // CONCLUSÃO
     text += `\n----------------------------------\n`;
     text += `CONCLUSÃO:\n`;
-    if (conclusao.length === 0) text += "1. Exame dentro dos padrões da normalidade.";
-    else {
+    if (conclusao.length === 0) text += "1. Exame dentro dos padrões da normalidade.";else
+    {
       conclusao.forEach((c, i) => text += `${i + 1}. ${c}\n`);
     }
 
     if (obs.length > 0) {
       text += `\nCONDUTA / OBS:\n`;
-      obs.forEach(o => text += `* ${o}\n`);
+      obs.forEach((o) => text += `* ${o}\n`);
     }
 
     text += `\n\nAssinado eletronicamente por:\n${doctorName} - ${doctorCrm}`;
@@ -437,8 +437,8 @@ export default function EndoReport() {
     const conclusionMatch = report.match(/CONCLUSÃO:\n([\s\S]*?)(?:\n\nCONDUTA|$)/);
     if (conclusionMatch) {
       const conclusionText = conclusionMatch[1];
-      const lines = conclusionText.split('\n').filter(l => l.trim());
-      lines.forEach(line => {
+      const lines = conclusionText.split('\n').filter((l) => l.trim());
+      lines.forEach((line) => {
         const cleaned = line.replace(/^\d+\.\s*/, '').trim();
         if (cleaned) conclusions.push(cleaned);
       });
@@ -510,7 +510,7 @@ export default function EndoReport() {
                   <FileText className="w-7 h-7 text-sky-600" />
                   Endo OREN.AI
                 </h1>
-                <p className="text-sm text-slate-500 font-medium ml-1 mt-1">EndoReport Pro v3.3 By OrensteinAI</p>
+                <p className="text-sm text-slate-500 font-medium ml-1 mt-1"></p>
               </div>
               <div className="flex items-center gap-2 flex-wrap">
                 <Link to={createPageUrl('Patients')}>
@@ -525,10 +525,10 @@ export default function EndoReport() {
                     <span className="hidden sm:inline">Config</span>
                   </Button>
                 </Link>
-                <button 
+                <button
                   onClick={handleReset}
-                  className="text-slate-500 hover:text-red-600 font-medium text-xs flex items-center gap-2 transition-colors px-3 py-2 rounded-lg hover:bg-red-50 border border-transparent hover:border-red-100 group"
-                >
+                  className="text-slate-500 hover:text-red-600 font-medium text-xs flex items-center gap-2 transition-colors px-3 py-2 rounded-lg hover:bg-red-50 border border-transparent hover:border-red-100 group">
+                  
                   <Trash2 className="w-4 h-4 group-hover:scale-110 transition-transform" />
                   <span className="hidden sm:inline">Novo</span>
                 </button>
@@ -546,16 +546,16 @@ export default function EndoReport() {
                   } else {
                     setPaciente('');
                   }
-                }}
-              />
+                }} />
+              
 
               <IdentificationSection
                 paciente={paciente}
                 setPaciente={setPaciente}
                 indicacao={indicacao}
                 setIndicacao={setIndicacao}
-                customIndications={customIndications}
-              />
+                customIndications={customIndications} />
+              
 
               {/* Preparo Note */}
               <div className="bg-white p-4 lg:p-6 rounded-xl border border-slate-200 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -567,8 +567,8 @@ export default function EndoReport() {
                   <Checkbox
                     checked={preparoInadequado}
                     onCheckedChange={setPreparoInadequado}
-                    className="data-[state=checked]:bg-red-500 data-[state=checked]:border-red-500"
-                  />
+                    className="data-[state=checked]:bg-red-500 data-[state=checked]:border-red-500" />
+                  
                   <span className="text-sm font-medium text-red-600">Preparo Inadequado</span>
                 </label>
               </div>
@@ -577,22 +577,22 @@ export default function EndoReport() {
                 isNormal={esoNormal}
                 setIsNormal={setEsoNormal}
                 data={esoData}
-                setData={setEsoData}
-              />
+                setData={setEsoData} />
+              
 
               <StomachSection
                 isNormal={estoNormal}
                 setIsNormal={setEstoNormal}
                 data={estoData}
-                setData={setEstoData}
-              />
+                setData={setEstoData} />
+              
 
               <DuodenumSection
                 isNormal={duoNormal}
                 setIsNormal={setDuoNormal}
                 data={duoData}
-                setData={setDuoData}
-              />
+                setData={setDuoData} />
+              
 
               <div className="h-24" />
             </div>
@@ -613,8 +613,8 @@ export default function EndoReport() {
             showBiopsyButton={checkBiopsyNeeded()}
             onSaveReport={handleSaveReport}
             saving={saving}
-            hasPatient={!!selectedPatient}
-          />
+            hasPatient={!!selectedPatient} />
+          
         </div>
 
         <BiopsyModal
@@ -624,9 +624,9 @@ export default function EndoReport() {
           doctorName={`${doctorName} - ${doctorCrm}`}
           esoData={esoData}
           estoData={estoData}
-          duoData={duoData}
-        />
+          duoData={duoData} />
+        
       </div>
-    </TooltipProvider>
-  );
+    </TooltipProvider>);
+
 }
