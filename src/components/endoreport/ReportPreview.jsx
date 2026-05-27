@@ -21,17 +21,19 @@ export default function ReportPreview({
 }) {
   const [editMode, setEditMode] = useState(false);
   const [editedReport, setEditedReport] = useState(report);
+  const [hasManualEdits, setHasManualEdits] = useState(false);
 
-  // Keep editedReport in sync with report whenever not in edit mode
+  // Only sync from parent when there are NO manual edits (user hasn't edited yet)
   useEffect(() => {
-    if (!editMode) {
+    if (!hasManualEdits) {
       setEditedReport(report);
     }
-  }, [report, editMode]);
+  }, [report]);
 
   const handleToggleEdit = () => {
     if (editMode) {
-      // Leaving edit mode — lock in the edits
+      // Confirm: lock edits, mark as manually edited so parent changes don't overwrite
+      setHasManualEdits(true);
       setEditMode(false);
     } else {
       setEditMode(true);
@@ -43,7 +45,7 @@ export default function ReportPreview({
     onCopy();
   };
 
-  const displayReport = editMode ? editedReport : report;
+  const displayReport = editedReport;
   const displayWordCount = displayReport.trim().split(/\s+/).length;
 
   return (
@@ -165,7 +167,7 @@ export default function ReportPreview({
 
       {/* Report Text */}
       <Textarea
-        value={editMode ? editedReport : report}
+        value={editedReport}
         readOnly={!editMode}
         onChange={(e) => editMode && setEditedReport(e.target.value)}
         className={`w-full h-full p-6 text-sm font-mono leading-relaxed text-slate-700 resize-none outline-none border-0 focus:ring-0 focus-visible:ring-0 transition-colors duration-200 ${editMode ? 'bg-amber-50/40 cursor-text' : 'bg-white cursor-default'}`}
