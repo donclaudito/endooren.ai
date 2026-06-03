@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { base44 } from '@/api/base44Client';
+import { apiClient } from '@/services/apiClient';
 import { useQuery } from '@tanstack/react-query';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -19,12 +19,12 @@ export default function PatientsPage() {
 
   const { data: patients = [], isLoading } = useQuery({
     queryKey: ['patients'],
-    queryFn: () => base44.entities.Patient.list('-created_date')
+    queryFn: () => apiClient.get('/api/patients')
   });
 
   const { data: reports = [] } = useQuery({
     queryKey: ['reports'],
-    queryFn: () => base44.entities.Report.list()
+    queryFn: () => apiClient.get('/api/exames')
   });
 
   const getPatientReportCount = (patientId) => {

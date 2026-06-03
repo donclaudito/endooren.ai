@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { base44 } from '@/api/base44Client';
+import { apiClient } from '@/services/apiClient';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -48,7 +48,7 @@ export default function PatientDialog({ open, onClose, patient = null }) {
   }, [patient, open]);
 
   const createMutation = useMutation({
-    mutationFn: (data) => base44.entities.Patient.create(data),
+    mutationFn: (data) => apiClient.post('/api/patients', data),
     onSuccess: () => {
       queryClient.invalidateQueries(['patients']);
       onClose();
@@ -56,7 +56,7 @@ export default function PatientDialog({ open, onClose, patient = null }) {
   });
 
   const updateMutation = useMutation({
-    mutationFn: ({ id, data }) => base44.entities.Patient.update(id, data),
+    mutationFn: ({ id, data }) => apiClient.put(`/api/patients?id=${id}`, data),
     onSuccess: () => {
       queryClient.invalidateQueries(['patients']);
       queryClient.invalidateQueries(['patient']);

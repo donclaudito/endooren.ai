@@ -4,10 +4,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Checkbox } from "@/components/ui/checkbox";
 import { Switch } from "@/components/ui/switch";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { HelpCircle } from 'lucide-react';
+import { HelpCircle, FileText } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
-export default function StomachSection({ isNormal, setIsNormal, data, setData }) {
+export default function StomachSection({ isNormal, setIsNormal, data, setData, templates, onApplyTemplate }) {
   const updateData = (key, value) => {
     setData(prev => ({ ...prev, [key]: value }));
   };
@@ -31,6 +31,28 @@ export default function StomachSection({ isNormal, setIsNormal, data, setData })
           </span>
         </label>
       </div>
+
+      {/* Templates Selector */}
+      {templates && templates.length > 0 && (
+        <div className="px-4 lg:px-6 py-2 bg-slate-50 border-b border-slate-100 flex items-center justify-between gap-3">
+          <span className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
+            <FileText className="w-3.5 h-3.5 text-sky-600" />
+            Templates Rápidos
+          </span>
+          <Select onValueChange={(val) => onApplyTemplate(val)}>
+            <SelectTrigger className="w-[200px] h-8 bg-white border-slate-200 text-xs">
+              <SelectValue placeholder="Selecione..." />
+            </SelectTrigger>
+            <SelectContent>
+              {templates.map(t => (
+                <SelectItem key={t.id} value={t.content} className="text-xs">
+                  {t.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      )}
 
       {/* Options */}
       <AnimatePresence>

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { base44 } from '@/api/base44Client';
+import { apiClient } from '@/services/apiClient';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -48,16 +48,18 @@ export default function SettingsPage() {
   const [saved, setSaved] = useState(false);
 
   // Fetch settings
-  const { data: settings, isLoading } = useQuery({
+  const { data: settings, isLoading: settingsLoading } = useQuery({
     queryKey: ['settings'],
-    queryFn: async () => {
-      const result = await base44.entities.Settings.list();
-      if (result && result.length > 0) {
-        return result[0];
-      }
-      return null;
-    }
+    queryFn: () => apiClient.get('/api/settings')
   });
+
+  // Fetch templates
+  const { data: templatesData, isLoading: templatesLoading } = useQuery({
+    queryKey: ['templates'],
+    queryFn: () => apiClient.get('/api/templates')
+  });
+
+  const isLoading = settingsLoading || templatesLoading;
 
   // States
   const [doctorName, setDoctorName] = useState('');
@@ -70,24 +72,33 @@ export default function SettingsPage() {
       setDoctorName(settings.doctor_name || '');
       setDoctorCrm(settings.doctor_crm || '');
       setCustomIndications(settings.custom_indications || []);
-      setCustomTemplates(settings.custom_templates || []);
     }
   }, [settings]);
 
-  // Mutations
-  const createMutation = useMutation({
-    mutationFn: (data) => base44.entities.Settings.create(data),
-    onSuccess: () => {
-      queryClient.invalidateQueries(['settings']);
-      setSaved(true);
-      setTimeout(() => setSaved(false), 3000);
+  useEffect(() => {
+    if (templatesData) {
+      setCustomTemplates(templatesData || []);
     }
-  });
+  }, [templatesData]);
 
-  const updateMutation = useMutation({
-    mutationFn: ({ id, data }) => base44.entities.Settings.update(id, data),
+  // Mutations
+  const saveMutation = useMutation({
+    mutationFn: async (data) => {
+      // Save doctor settings
+      await apiClient.put('/api/settings', {
+        doctor_name: data.doctor_name,
+        doctor_crm: data.doctor_crm,
+        custom_indications: data.custom_indications
+      });
+
+      // Batch sync templates
+      await apiClient.put('/api/templates', data.custom_templates);
+      
+      return data;
+    },
     onSuccess: () => {
       queryClient.invalidateQueries(['settings']);
+      queryClient.invalidateQueries(['templates']);
       setSaved(true);
       setTimeout(() => setSaved(false), 3000);
     }
@@ -101,11 +112,7 @@ export default function SettingsPage() {
       custom_templates: customTemplates
     };
 
-    if (settings && settings.id) {
-      updateMutation.mutate({ id: settings.id, data });
-    } else {
-      createMutation.mutate(data);
-    }
+    saveMutation.mutate(data);
   };
 
   if (isLoading) {
@@ -143,7 +150,7 @@ export default function SettingsPage() {
             <Button 
               onClick={handleSave} 
               className="bg-sky-600 hover:bg-sky-700 gap-2"
-              disabled={createMutation.isPending || updateMutation.isPending}
+              disabled={saveMutation.isPending}
             >
               {saved ? (
                 <>

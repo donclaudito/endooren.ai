@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { base44 } from '@/api/base44Client';
+import { apiClient } from '@/services/apiClient';
+import { useAuth } from '@/lib/AuthContext';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -12,7 +13,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import {
   Stethoscope, User, Trash2, Sparkles, Copy, Check, RotateCcw,
-  Microscope, Printer, FileText, HelpCircle, Bell, X, Settings, Users } from
+  Microscope, Printer, FileText, HelpCircle, Bell, X, Settings, Users, LogOut } from
 'lucide-react';
 import { Link } from 'react-router-dom';
 import { createPageUrl } from '../utils';
@@ -24,21 +25,24 @@ import DuodenumSection from '@/components/endoreport/DuodenumSection';
 import ReportPreview from '@/components/endoreport/ReportPreview';
 import BiopsyModal from '@/components/endoreport/BiopsyModal';
 import PatientSelector from '@/components/endoreport/PatientSelector';
+import { getEsophagitisReport, getAnatomicalReport } from '@/utils/esophagitisDb';
 
 export default function EndoReport() {
   const urlParams = new URLSearchParams(window.location.search);
   const patientIdFromUrl = urlParams.get('patient_id');
 
+  const { logout } = useAuth();
+
   // Fetch settings
   const { data: settings } = useQuery({
     queryKey: ['settings'],
-    queryFn: async () => {
-      const result = await base44.entities.Settings.list();
-      if (result && result.length > 0) {
-        return result[0];
-      }
-      return null;
-    }
+    queryFn: () => apiClient.get('/api/settings')
+  });
+
+  // Fetch templates
+  const { data: templates } = useQuery({
+    queryKey: ['templates'],
+    queryFn: () => apiClient.get('/api/templates')
   });
 
   const doctorName = settings?.doctor_name || 'Dr(a). Endoscopista';
@@ -51,10 +55,7 @@ export default function EndoReport() {
   // Fetch patient if ID in URL
   const { data: patientFromUrl } = useQuery({
     queryKey: ['patient-from-url', patientIdFromUrl],
-    queryFn: async () => {
-      const results = await base44.entities.Patient.filter({ id: patientIdFromUrl });
-      return results[0] || null;
-    },
+    queryFn: () => apiClient.get(`/api/patients?id=${patientIdFromUrl}`),
     enabled: !!patientIdFromUrl
   });
 
@@ -80,7 +81,8 @@ export default function EndoReport() {
     esofagite: false,
     grauEsofagite: 'A',
     hernia: false,
-    tamHernia: 3,
+    anatomicoId: 'teg_alinhada',
+    tamHernia: 40,
     varizes: false,
     varizesCalibre: 'fino',
     varizesRedSpots: false,
@@ -144,7 +146,7 @@ export default function EndoReport() {
   const queryClient = useQueryClient();
 
   const saveReportMutation = useMutation({
-    mutationFn: (data) => base44.entities.Report.create(data),
+    mutationFn: (data) => apiClient.post('/api/exames', data),
     onSuccess: () => {
       queryClient.invalidateQueries(['patient-reports']);
       setSaving(false);
@@ -157,31 +159,99 @@ export default function EndoReport() {
     estoData.neoplasia || estoData.sydney || duoData.celiaca || estoData.polipo;
   }, [esoData, estoData, duoData]);
 
-  const generateReport = useCallback(() => {
-    let text = "";
+  const parseReportSections = (text) => {
+    const sections = {
+      header: '',
+      esophagus: '',
+      stomach: '',
+      duodenum: '',
+      conclusion: '',
+      obs: '',
+      signature: ''
+    };
 
-    // Header
+    if (!text) return sections;
+    const normalized = text.replace(/\r\n/g, '\n');
+
+    const esoIdx = normalized.indexOf('ESÔFAGO:\n');
+    const estoIdx = normalized.indexOf('ESTÔMAGO:\n');
+    const duoIdx = normalized.indexOf('DUODENO:\n');
+    const conclIdx = normalized.indexOf('----------------------------------\nCONCLUSÃO:\n');
+    const obsIdx = normalized.indexOf('CONDUTA / OBS:\n');
+    const sigIdx = normalized.indexOf('Assinado eletronicamente por:\n');
+
+    if (esoIdx !== -1) {
+      sections.header = normalized.substring(0, esoIdx).trim();
+      const esoEnd = estoIdx !== -1 ? estoIdx : normalized.length;
+      sections.esophagus = normalized.substring(esoIdx + 'ESÔFAGO:\n'.length, esoEnd).trim();
+    } else {
+      sections.header = normalized.trim();
+    }
+
+    if (estoIdx !== -1) {
+      const estoEnd = duoIdx !== -1 ? duoIdx : normalized.length;
+      sections.stomach = normalized.substring(estoIdx + 'ESTÔMAGO:\n'.length, estoEnd).trim();
+    }
+
+    if (duoIdx !== -1) {
+      const duoEnd = conclIdx !== -1 ? conclIdx : normalized.length;
+      sections.duodenum = normalized.substring(duoIdx + 'DUODENO:\n'.length, duoEnd).trim();
+    }
+
+    if (conclIdx !== -1) {
+      const conclEnd = obsIdx !== -1 ? obsIdx : sigIdx !== -1 ? sigIdx : normalized.length;
+      sections.conclusion = normalized.substring(conclIdx + '----------------------------------\nCONCLUSÃO:\n'.length, conclEnd).trim();
+    }
+
+    if (obsIdx !== -1) {
+      const obsEnd = sigIdx !== -1 ? sigIdx : normalized.length;
+      sections.obs = normalized.substring(obsIdx + 'CONDUTA / OBS:\n'.length, obsEnd).trim();
+    }
+
+    if (sigIdx !== -1) {
+      sections.signature = normalized.substring(sigIdx).trim();
+    }
+
+    return sections;
+  };
+
+  const buildReportFromSections = (sections) => {
+    let text = (sections.header || '').trim() + '\n\n';
+    
+    text += `ESÔFAGO:\n${sections.esophagus || ''}\n\n`;
+    text += `ESTÔMAGO:\n${sections.stomach || ''}\n\n`;
+    text += `DUODENO:\n${sections.duodenum || ''}\n\n`;
+    text += `----------------------------------\n`;
+    text += `CONCLUSÃO:\n${sections.conclusion || ''}\n`;
+    
+    if (sections.obs) {
+      text += `\nCONDUTA / OBS:\n${sections.obs}\n`;
+    }
+    
+    if (sections.signature) {
+      text += `\n\n${sections.signature}`;
+    }
+    
+    return text;
+  };
+
+  const generateHeaderText = () => {
+    let text = "";
     if (paciente) text += `PACIENTE: ${paciente.toUpperCase()}\n`;
     text += `INDICAÇÃO: ${indicacao}\n`;
     text += `PREPARO: ${preparoInadequado ? "Inadequado." : "Jejum adequado (6-8h)."}\n`;
-    text += `SEDAÇÃO: Realizada com boa tolerância.\n\n`;
-    text += `DESCRIÇÃO DOS ACHADOS\n=====================\n\n`;
+    text += `SEDAÇÃO: Realizada com boa tolerância.\n`;
+    return text.trim();
+  };
 
-    let conclusao = [];
-    let obs = [];
-
-    if (preparoInadequado) {
-      obs.push("Preparo inadequado, limitando a avaliação completa de algumas áreas.");
-    }
-
-    // ESÔFAGO
-    text += `ESÔFAGO:\n`;
+  const generateEsophagusText = () => {
+    let e_txt = "";
     if (esoNormal) {
-      text += aiMode ?
-      `Introdução do aparelho sob visão direta. Esôfago de calibre, distensibilidade e trajeto anatômicos preservados. Mucosa de coloração rósea, brilho e relevo habituais, livre de lesões focais ou difusas. Transição esofagogástrica coincidente com o pinçamento diafragmático.\n` :
-      `Calibre e distensibilidade preservados. Mucosa de aspecto normal, sem lesões. Transição esofagogástrica coincidente com o pinçamento diafragmático.\n`;
+      e_txt = aiMode ?
+      `Introdução do aparelho sob visão direta. Esôfago de calibre, distensibilidade e trajeto anatômicos preservados. Mucosa de coloração rósea, brilho e relevo habituais, livre de lesões focais ou difusas. Transição esofagogástrica coincidente com o pinçamento diafragmático.` :
+      `Calibre e distensibilidade preservados. Mucosa de aspecto normal, sem lesões. Transição esofagogástrica coincidente com o pinçamento diafragmático.`;
     } else {
-      let e_txt = aiMode ? "Esôfago com calibre e distensibilidade preservados (salvo se descrito abaixo). " : "Calibre preservado. ";
+      e_txt = aiMode ? "Esôfago com calibre e distensibilidade preservados (salvo se descrito abaixo). " : "Calibre preservado. ";
 
       if (esoData.neoplasia) {
         if (aiMode) {
@@ -189,28 +259,48 @@ export default function EndoReport() {
         } else {
           e_txt += `\nLesão neoplásica ${esoData.neoTipo} em ${esoData.neoLocal}. ${esoData.neoEstenose ? "Causa estenose." : "Sem estenose."} `;
         }
-        conclusao.push(`Tumor de Esôfago em ${esoData.neoLocal} (Suspeita de Neoplasia)`);
-        obs.push("Realizadas biópsias da lesão esofágica.");
       }
 
       if (esoData.esofagite) {
-        const grau = esoData.grauEsofagite;
-        let desc = grau === 'A' || grau === 'B' ? "erosões não confluentes" : "erosões confluentes";
-        if (aiMode) {
-          e_txt += `Observam-se soluções de continuidade na mucosa (erosões) ${desc} no terço distal, compatíveis com Esofagite de Refluxo (Classificação de Los Angeles grau ${grau}). `;
+        if (esoData.esofagiteId) {
+          const report = getEsophagitisReport(esoData.esofagiteId, esoData.esofagiteSubclassificacao, aiMode);
+          if (report) {
+            e_txt += `\n${report.text} `;
+          }
         } else {
-          e_txt += `Presença de ${desc} na mucosa distal, compatível com Esofagite Los Angeles ${grau}. `;
+          const grau = esoData.grauEsofagite;
+          let desc = grau === 'A' || grau === 'B' ? "erosões não confluentes" : "erosões confluentes";
+          if (aiMode) {
+            e_txt += `Observam-se soluções de continuidade na mucosa (erosões) ${desc} no terço distal, compatíveis com Esofagite de Refluxo (Classificação de Los Angeles grau ${grau}). `;
+          } else {
+            e_txt += `Presença de ${desc} na mucosa distal, compatível com Esofagite Los Angeles ${grau}. `;
+          }
         }
-        conclusao.push(`Esofagite de Refluxo (Los Angeles ${grau})`);
       }
 
-      if (esoData.hernia) {
-        if (aiMode) {
-          e_txt += `Transição esofagogástrica (Linha Z) elevada cerca de ${esoData.tamHernia}cm em relação ao pinçamento diafragmático, caracterizando Hérnia Hiatal por deslizamento. `;
-        } else {
-          e_txt += `Linha Z elevada cerca de ${esoData.tamHernia}cm acima do pinçamento diafragmático. `;
+      if (esoData.anatomicoId) {
+        const report = getAnatomicalReport(esoData.anatomicoId, esoData.tamHernia);
+        if (report) {
+          e_txt += `\n${report.text} `;
         }
-        conclusao.push(`Hérnia Hiatal por deslizamento (${esoData.tamHernia}cm)`);
+      } else {
+        if (esoData.hernia) {
+          if (aiMode) {
+            e_txt += `\nJunção esofagogástrica (topo das pregas gástricas) visualizada acima do pinçamento diafragmático, determinando deslocamento cranial do estômago proximal de cerca de ${esoData.tamHernia || 3} cm. Presença de câmara herniária. `;
+          } else {
+            e_txt += `\nLinha Z elevada cerca de ${esoData.tamHernia || 3}cm acima do pinçamento diafragmático. `;
+          }
+        } else {
+          const dist = esoData.tamHernia !== undefined ? esoData.tamHernia : 40;
+          e_txt += `\nLinha Z e junção esofagogástrica (topo das pregas gástricas) situadas no mesmo nível do pinçamento diafragmático, a ${dist} cm dos incisivos superiores. Transição epitelial nítida e sinuosa. `;
+        }
+      }
+
+      if (esoData.hiatoLaxo) {
+        const report = getAnatomicalReport('pinçamento_laxo');
+        if (report) {
+          e_txt += `\n${report.text} `;
+        }
       }
 
       if (esoData.varizes) {
@@ -220,9 +310,6 @@ export default function EndoReport() {
         } else {
           e_txt += `\nPresença de varizes esofágicas de ${cal_txt}. ${esoData.varizesRedSpots ? "Com sinais vermelhos." : "Sem sinais de sangramento recente."} `;
         }
-        let conc_var = `Varizes Esofágicas de ${cal_txt}`;
-        if (esoData.varizesRedSpots) conc_var += " com sinais de alto risco";
-        conclusao.push(conc_var);
       }
 
       if (esoData.barrett) {
@@ -231,52 +318,43 @@ export default function EndoReport() {
         } else {
           e_txt += `\nLinguetas de mucosa rosa-salmão em esôfago distal. Critérios de Praga: C${esoData.barrettC}M${esoData.barrettM}. `;
         }
-        conclusao.push(`Suspeita de Esôfago de Barrett (Praga C${esoData.barrettC}M${esoData.barrettM})`);
-        obs.push("Biópsias realizadas em protocolo de Seattle para confirmação histológica de Barrett.");
       }
 
-      if (esoData.eosinofilica) {
+      if (esoData.eosinofilica && !esoData.esofagiteId) {
         e_txt += aiMode ? "\nPresença de anéis concêntricos (traquealização) e sulcos longitudinais na mucosa esofágica. " : "\nTraquealização e sulcos longitudinais. ";
-        conclusao.push("Suspeita de Esofagite Eosinofílica");
-        obs.push("Realizadas biópsias seriadas de esôfago (proximal/distal) para contagem de eosinófilos.");
       }
 
-      if (esoData.candida) {
+      if (esoData.candida && !esoData.esofagiteId) {
         e_txt += `\nPresença de placas esbranquiçadas aderidas à mucosa (Kodsi ${esoData.candidaKodsi}). `;
-        conclusao.push(`Candidíase Esofágica (Kodsi ${esoData.candidaKodsi})`);
       }
 
       if (esoData.diverticulo) {
         e_txt += "\nSacularidade diverticular de boca larga observada em parede esofágica. ";
-        conclusao.push("Divertículo Esofágico");
       }
 
       if (esoData.malloryWeiss) {
         e_txt += "\nLaceração longitudinal na mucosa da transição esofagogástrica com fundo de fibrina. ";
-        conclusao.push("Laceração de Mallory-Weiss");
       }
 
       if (esoData.estenose) {
         e_txt += `\nRedução do calibre luminal (estenose). `;
-        conclusao.push(`Estenose Esofágica`);
       }
 
       if (esoData.ulcera) {
         e_txt += "\nÚlcera em mucosa esofágica. ";
-        conclusao.push("Úlcera Esofágica");
       }
-
-      text += e_txt + "\n";
     }
+    return e_txt.trim();
+  };
 
-    // ESTÔMAGO
-    text += `\nESTÔMAGO:\n`;
+  const generateStomachText = () => {
+    let s_txt = "";
     if (estoNormal) {
-      text += aiMode ?
-      `Estômago com boa expansibilidade à insuflação. Lago mucoso claro e em quantidade habitual. Mucosa de fundo, corpo e antro com aspecto íntegro. Manobra de retrovisão sem alterações. Piloro centrado.\n` :
-      `Lago mucoso claro. Fundo, corpo e antro com mucosa íntegra. Retrovisão sem alterações. Piloro permeável.\n`;
+      s_txt = aiMode ?
+      `Estômago com boa expansibilidade à insuflação. Lago mucoso claro e em quantidade habitual. Mucosa de fundo, corpo e antro com aspecto íntegro. Manobra de retrovisão sem alterações. Piloro centrado.` :
+      `Lago mucoso claro. Fundo, corpo e antro com mucosa íntegra. Retrovisão sem alterações. Piloro permeável.`;
     } else {
-      let s_txt = aiMode ? "Lago mucoso de aspecto habitual. " : "Lago mucoso claro. ";
+      s_txt = aiMode ? "Lago mucoso de aspecto habitual. " : "Lago mucoso claro. ";
 
       if (estoData.neoplasia) {
         if (aiMode) {
@@ -284,78 +362,60 @@ export default function EndoReport() {
         } else {
           s_txt += `\nLesão tumoral Borrmann ${estoData.neoBorrmann} em ${estoData.neoLocal}. `;
         }
-        conclusao.push(`Neoplasia Gástrica Avançada (Borrmann ${estoData.neoBorrmann}) de ${estoData.neoLocal}`);
-        obs.push("Realizadas múltiplas biópsias da lesão gástrica.");
       }
 
-      if (!estoData.atrofia || estoData.atrofia && estoData.gastriteTipo !== 'Enantematosa') {
+      if (!estoData.atrofia || (estoData.atrofia && estoData.gastriteTipo !== 'Enantematosa')) {
         if (aiMode) {
           s_txt += `Mucosa de ${estoData.gastriteLocal} exibindo hiperemia difusa de padrão ${estoData.gastriteTipo.toLowerCase()}, de intensidade ${estoData.gastriteIntensidade.toLowerCase()}. `;
         } else {
           s_txt += `Mucosa de ${estoData.gastriteLocal} apresentando hiperemia ${estoData.gastriteIntensidade.toLowerCase()} (${estoData.gastriteTipo.toLowerCase()}). `;
         }
-        conclusao.push(`Gastrite ${estoData.gastriteTipo} ${estoData.gastriteIntensidade} de ${estoData.gastriteLocal}`);
       }
 
       if (estoData.atrofia) {
         s_txt += `Mucosa adelgaçada, pálida, com visualização da trama vascular (Kimura ${estoData.kimura}). `;
-        conclusao.push(`Gastrite Atrófica (Kimura-Takemoto ${estoData.kimura})`);
-
         if (estoData.metaplasia) {
           s_txt += "Áreas de metaplasia intestinal visíveis. ";
-          conclusao.push("Metaplasia Intestinal Gástrica");
-        }
-        if (estoData.sydney) {
-          obs.push("Realizadas biópsias gástricas (Protocolo de Sydney) para estadiamento OLGA/OLGIM.");
         }
       }
 
       if (estoData.polipo) {
         s_txt += `\nLesão elevada em ${estoData.polipoLocal}, ${estoData.polipoTam}mm, Classificação de Paris ${estoData.polipoParis}. Realizada ${estoData.polipoConduta}. `;
-        let conduta_nome = estoData.polipoConduta === 'biopsia' ? "biopsiado" : "ressecado";
-        conclusao.push(`Pólipo gástrico de ${estoData.polipoLocal} ${conduta_nome} (Paris ${estoData.polipoParis})`);
       }
 
       if (estoData.subepitelial) {
         s_txt += aiMode ? "\nAbaulamento da parede gástrica recoberto por mucosa íntegra e de coloração normal (lesão subepitelial). Sinal da tenda positivo. " : "\nLesão subepitelial com mucosa íntegra. ";
-        conclusao.push("Lesão subepitelial gástrica (Sugestiva de Lipoma/GIST/Leiomioma)");
       }
 
       if (estoData.xantelasma) {
         s_txt += "\nPlacas amareladas planas, levemente elevadas na mucosa gástrica. ";
-        conclusao.push("Xantelasma Gástrico");
       }
 
       if (estoData.gave) {
         s_txt += "\nEstrias vasculares avermelhadas longitudinais convergindo para o piloro (aspecto de estômago em melancia). ";
-        conclusao.push("Ectasia Vascular Antral Gástrica (GAVE)");
-        if (aiMode) obs.push("Sugerido tratamento com Plasma de Argônio se houver anemia associada.");
       }
 
       if (estoData.urease) {
         s_txt += `\nTeste de urease: ${estoData.ureaseRes}.`;
-        conclusao.push(`Teste de Urease: ${estoData.ureaseRes}`);
       }
 
       s_txt += aiMode ? " Manobra de retrovisão realizada com sucesso." : " Manobra de retrovisão realizada.";
-      text += s_txt + "\n";
     }
+    return s_txt.trim();
+  };
 
-    // DUODENO
-    text += `\nDUODENO:\n`;
+  const generateDuodenumText = () => {
+    let d_txt = "";
     if (duoNormal) {
-      text += aiMode ?
-      `Bulbo duodenal amplo. Segunda porção duodenal com pregueado de Kerckring preservado e papila de aspecto macroscópico habitual.\n` :
-      `Bulbo e segunda porção sem alterações.\n`;
+      d_txt = aiMode ?
+      `Bulbo duodenal amplo. Segunda porção duodenal com pregueado de Kerckring preservado e papila de aspecto macroscópico habitual.` :
+      `Bulbo e segunda porção sem alterações.`;
     } else {
-      let d_txt = "";
       if (duoData.duodenite) {
         d_txt += "Mucosa do bulbo enantematosa (Duodenite). ";
-        conclusao.push("Duodenite Erosiva");
       }
       if (duoData.ulcera) {
         d_txt += "Lesão ulcerada em bulbo duodenal. ";
-        conclusao.push("Úlcera Bulbar");
       }
 
       if (duoData.celiaca) {
@@ -365,43 +425,231 @@ export default function EndoReport() {
         if (duoData.celSerrilhado) achadosCel.push("serrilhado de pregas");
 
         let descCel = achadosCel.length > 0 ? achadosCel.join(", ") : aiMode ? "redução do pregueado, serrilhado e mosaico" : "sinais de atrofia vilositária";
-
         d_txt += aiMode ? `\nSegunda porção duodenal apresentando ${descCel}. ` : `\nPresença de ${descCel} na segunda porção duodenal. `;
-
-        conclusao.push("Sinais endoscópicos sugestivos de atrofia vilositária (Suspeita de Doença Celíaca)");
-        obs.push("Realizadas biópsias de segunda porção duodenal para investigação de enteropatia.");
       }
 
       if (duoData.diverticulo) {
         d_txt += "\nDivertículo de boca larga na segunda porção duodenal (periampular). ";
-        conclusao.push("Divertículo Duodenal Periampular");
       }
 
-      if (d_txt === "") d_txt = "Bulbo e segunda porção anatômicos.";
-      text += d_txt + "\n";
+      if (d_txt === "") d_txt = "Bulbo e segunda porção duodenais sem alterações.";
+    }
+    return d_txt.trim();
+  };
+
+  const generateConclusionsText = () => {
+    let conclusions = [];
+    if (!esoNormal) {
+      if (esoData.neoplasia) conclusions.push(`Tumor de Esôfago em ${esoData.neoLocal} (Suspeita de Neoplasia)`);
+      if (esoData.esofagite) {
+        if (esoData.esofagiteId) {
+          const rep = getEsophagitisReport(esoData.esofagiteId, esoData.esofagiteSubclassificacao, aiMode);
+          if (rep) conclusions.push(rep.conclusao);
+        } else {
+          conclusions.push(`Esofagite de Refluxo (Los Angeles ${esoData.grauEsofagite})`);
+        }
+      }
+      if (esoData.anatomicoId) {
+        const rep = getAnatomicalReport(esoData.anatomicoId, esoData.tamHernia);
+        if (rep && rep.conclusao) conclusions.push(rep.conclusao);
+      } else if (esoData.hernia) {
+        conclusions.push(`Hérnia Hiatal por deslizamento (${esoData.tamHernia || 3}cm)`);
+      }
+      if (esoData.hiatoLaxo) {
+        const rep = getAnatomicalReport('pinçamento_laxo');
+        if (rep) conclusions.push(rep.conclusao);
+      }
+      if (esoData.varizes) {
+        let cal_txt = esoData.varizesCalibre === 'fino' ? "fino calibre" : esoData.varizesCalibre === 'medio' ? "médio calibre" : "grosso calibre";
+        let conc_var = `Varizes Esofágicas de ${cal_txt}`;
+        if (esoData.varizesRedSpots) conc_var += " com sinais de alto risco";
+        conclusions.push(conc_var);
+      }
+      if (esoData.barrett) conclusions.push(`Suspeita de Esôfago de Barrett (Praga C${esoData.barrettC}M${esoData.barrettM})`);
+      if (esoData.eosinofilica && !esoData.esofagiteId) conclusions.push("Suspeita de Esofagite Eosinofílica");
+      if (esoData.candida && !esoData.esofagiteId) conclusions.push(`Candidíase Esofágica (Kodsi ${esoData.candidaKodsi})`);
+      if (esoData.diverticulo) conclusions.push("Divertículo Esofágico");
+      if (esoData.malloryWeiss) conclusions.push("Laceração de Mallory-Weiss");
+      if (esoData.estenose) conclusions.push(`Estenose Esofágica`);
+      if (esoData.ulcera) conclusions.push("Úlcera Esofágica");
     }
 
-    // CONCLUSÃO
-    text += `\n----------------------------------\n`;
-    text += `CONCLUSÃO:\n`;
-    if (conclusao.length === 0) text += "1. Exame dentro dos padrões da normalidade.";else
-    {
-      conclusao.forEach((c, i) => text += `${i + 1}. ${c}\n`);
+    if (!estoNormal) {
+      if (estoData.neoplasia) conclusions.push(`Neoplasia Gástrica Avançada (Borrmann ${estoData.neoBorrmann}) de ${estoData.neoLocal}`);
+      if (!estoData.atrofia || (estoData.atrofia && estoData.gastriteTipo !== 'Enantematosa')) {
+        conclusions.push(`Gastrite ${estoData.gastriteTipo} ${estoData.gastriteIntensidade} de ${estoData.gastriteLocal}`);
+      }
+      if (estoData.atrofia) {
+        conclusions.push(`Gastrite Atrófica (Kimura-Takemoto ${estoData.kimura})`);
+        if (estoData.metaplasia) conclusions.push("Metaplasia Intestinal Gástrica");
+      }
+      if (estoData.polipo) {
+        let conduta_nome = estoData.polipoConduta === 'biopsia' ? "biopsiado" : "ressecado";
+        conclusions.push(`Pólipo gástrico de ${estoData.polipoLocal} ${conduta_nome} (Paris ${estoData.polipoParis})`);
+      }
+      if (estoData.subepitelial) conclusions.push("Lesão subepitelial gástrica (Sugestiva de Lipoma/GIST/Leiomioma)");
+      if (estoData.xantelasma) conclusions.push("Xantelasma Gástrico");
+      if (estoData.gave) conclusions.push("Ectasia Vascular Antral Gástrica (GAVE)");
+      if (estoData.urease) conclusions.push(`Teste de Urease: ${estoData.ureaseRes}`);
     }
 
-    if (obs.length > 0) {
-      text += `\nCONDUTA / OBS:\n`;
-      obs.forEach((o) => text += `* ${o}\n`);
+    if (!duoNormal) {
+      if (duoData.duodenite) conclusions.push("Duodenite Erosiva");
+      if (duoData.ulcera) conclusions.push("Úlcera Bulbar");
+      if (duoData.celiaca) conclusions.push("Sinais endoscópicos sugestivos de atrofia vilositária (Suspeita de Doença Celíaca)");
+      if (duoData.diverticulo) conclusions.push("Divertículo Duodenal Periampular");
     }
 
-    text += `\n\nAssinado eletronicamente por:\n${doctorName} - ${doctorCrm}`;
+    if (conclusions.length === 0) return "1. Exame dentro dos padrões da normalidade.";
+    return conclusions.map((c, i) => `${i + 1}. ${c}`).join('\n');
+  };
 
-    setReport(text);
-  }, [paciente, indicacao, preparoInadequado, esoNormal, esoData, estoNormal, estoData, duoNormal, duoData, aiMode, doctorName, doctorCrm]);
+  const generateObsText = () => {
+    let obs = [];
+    if (preparoInadequado) {
+      obs.push("Preparo inadequado, limitando a avaliação completa de algumas áreas.");
+    }
+    if (!esoNormal) {
+      if (esoData.neoplasia) obs.push("Realizadas biópsias da lesão esofágica.");
+      if (esoData.esofagite && esoData.esofagiteId) {
+        const rep = getEsophagitisReport(esoData.esofagiteId, esoData.esofagiteSubclassificacao, aiMode);
+        if (rep && rep.biopsy) obs.push(rep.biopsyDesc || "Realizadas biópsias da mucosa esofágica.");
+      }
+      if (esoData.barrett) obs.push("Biópsias realizadas em protocolo de Seattle para confirmação histológica de Barrett.");
+      if (esoData.eosinofilica && !esoData.esofagiteId) obs.push("Realizadas biópsias seriadas de esôfago (proximal/distal) para contagem de eosinófilos.");
+    }
+    if (!estoNormal) {
+      if (estoData.neoplasia) obs.push("Realizadas múltiplas biópsias da lesão gástrica.");
+      if (estoData.atrofia && estoData.sydney) obs.push("Realizadas biópsias gástricas (Protocolo de Sydney) para estadiamento OLGA/OLGIM.");
+    }
+    if (!duoNormal) {
+      if (duoData.celiaca) obs.push("Realizadas biópsias de segunda porção duodenal para investigação de enteropatia.");
+    }
+
+    return obs.map(o => `* ${o}`).join('\n');
+  };
+
+  const generateFullReport = (prefixes) => {
+    const p = prefixes || { esophagus: '', stomach: '', duodenum: '' };
+    return buildReportFromSections({
+      header: generateHeaderText(),
+      esophagus: p.esophagus ? `${p.esophagus}\n${generateEsophagusText()}`.trim() : generateEsophagusText(),
+      stomach: p.stomach ? `${p.stomach}\n${generateStomachText()}`.trim() : generateStomachText(),
+      duodenum: p.duodenum ? `${p.duodenum}\n${generateDuodenumText()}`.trim() : generateDuodenumText(),
+      conclusion: generateConclusionsText(),
+      obs: generateObsText(),
+      signature: `Assinado eletronicamente por:\n${doctorName} - ${doctorCrm}`
+    });
+  };
+
+  const [hasManualEdits, setHasManualEdits] = useState(false);
+  // Template prefixes per section — combined with auto-generated findings text
+  const [templatePrefixes, setTemplatePrefixes] = useState({
+    esophagus: '',
+    stomach: '',
+    duodenum: ''
+  });
+
+  const prevEsoDataRef = React.useRef(esoData);
+  const prevEsoNormalRef = React.useRef(esoNormal);
+  const prevEstoDataRef = React.useRef(estoData);
+  const prevEstoNormalRef = React.useRef(estoNormal);
+  const prevDuoDataRef = React.useRef(duoData);
+  const prevDuoNormalRef = React.useRef(duoNormal);
+  const prevHeaderRef = React.useRef({ paciente, indicacao, preparoInadequado });
+  const prevTemplatePrefixesRef = React.useRef({ esophagus: '', stomach: '', duodenum: '' });
+
+  // Combine template prefix + auto-generated findings for a section
+  const buildSectionText = (prefix, generatedText) => {
+    if (!prefix) return generatedText;
+    if (!generatedText) return prefix;
+    return `${prefix}\n${generatedText}`;
+  };
+
+  const handleApplyTemplate = (sectionKey, content) => {
+    // Store the template as a prefix for this section
+    setTemplatePrefixes(prev => ({ ...prev, [sectionKey]: content }));
+    setHasManualEdits(true);
+  };
+
+  const handleReportChange = (newVal) => {
+    setReport(newVal);
+    setHasManualEdits(true);
+  };
 
   useEffect(() => {
-    generateReport();
-  }, [generateReport]);
+    if (!report || !hasManualEdits) {
+      // First render or after reset — regenerate everything (include any active prefixes)
+      const full = generateFullReport(templatePrefixes);
+      setReport(full);
+
+      prevEsoNormalRef.current = esoNormal;
+      prevEsoDataRef.current = esoData;
+      prevEstoNormalRef.current = estoNormal;
+      prevEstoDataRef.current = estoData;
+      prevDuoNormalRef.current = duoNormal;
+      prevDuoDataRef.current = duoData;
+      prevHeaderRef.current = { paciente, indicacao, preparoInadequado };
+      prevTemplatePrefixesRef.current = templatePrefixes;
+    } else {
+      let isChanged = false;
+      const sections = parseReportSections(report);
+
+      // Header — always regenerate when patient/indication changes
+      if (prevHeaderRef.current.paciente !== paciente ||
+          prevHeaderRef.current.indicacao !== indicacao ||
+          prevHeaderRef.current.preparoInadequado !== preparoInadequado) {
+        sections.header = generateHeaderText();
+        prevHeaderRef.current = { paciente, indicacao, preparoInadequado };
+        isChanged = true;
+      }
+
+      // Esophagus — regenerate + prepend template prefix when data or prefix changes
+      const esoChanged = prevEsoNormalRef.current !== esoNormal || prevEsoDataRef.current !== esoData;
+      const esoPrefixChanged = prevTemplatePrefixesRef.current.esophagus !== templatePrefixes.esophagus;
+      if (esoChanged || esoPrefixChanged) {
+        prevEsoNormalRef.current = esoNormal;
+        prevEsoDataRef.current = esoData;
+        sections.esophagus = buildSectionText(templatePrefixes.esophagus, generateEsophagusText());
+        isChanged = true;
+      }
+
+      // Stomach — regenerate + prepend template prefix when data or prefix changes
+      const estoChanged = prevEstoNormalRef.current !== estoNormal || prevEstoDataRef.current !== estoData;
+      const estoPrefixChanged = prevTemplatePrefixesRef.current.stomach !== templatePrefixes.stomach;
+      if (estoChanged || estoPrefixChanged) {
+        prevEstoNormalRef.current = estoNormal;
+        prevEstoDataRef.current = estoData;
+        sections.stomach = buildSectionText(templatePrefixes.stomach, generateStomachText());
+        isChanged = true;
+      }
+
+      // Duodenum — regenerate + prepend template prefix when data or prefix changes
+      const duoChanged = prevDuoNormalRef.current !== duoNormal || prevDuoDataRef.current !== duoData;
+      const duoPrefixChanged = prevTemplatePrefixesRef.current.duodenum !== templatePrefixes.duodenum;
+      if (duoChanged || duoPrefixChanged) {
+        prevDuoNormalRef.current = duoNormal;
+        prevDuoDataRef.current = duoData;
+        sections.duodenum = buildSectionText(templatePrefixes.duodenum, generateDuodenumText());
+        isChanged = true;
+      }
+
+      if (isChanged) {
+        prevTemplatePrefixesRef.current = templatePrefixes;
+        // Conclusion always reflects all active checkboxes
+        sections.conclusion = generateConclusionsText();
+        sections.obs = generateObsText();
+        setReport(buildReportFromSections(sections));
+      }
+    }
+  }, [
+    paciente, indicacao, preparoInadequado,
+    esoNormal, esoData,
+    estoNormal, estoData,
+    duoNormal, duoData,
+    aiMode, doctorName, doctorCrm,
+    hasManualEdits, templatePrefixes
+  ]);
 
   const handleToggleAI = () => {
     if (!aiMode) {
@@ -411,7 +659,11 @@ export default function EndoReport() {
         setAiLoading(false);
       }, 800);
     } else {
+      // Reset clears template prefixes and regenerates the full report
       setAiMode(false);
+      setHasManualEdits(false);
+      setTemplatePrefixes({ esophagus: '', stomach: '', duodenum: '' });
+      setReport('');
     }
   };
 
@@ -471,7 +723,7 @@ export default function EndoReport() {
       setEsoNormal(true);
       setEsoData({
         neoplasia: false, neoTipo: 'vegetante', neoLocal: 'terço distal', neoEstenose: false,
-        esofagite: false, grauEsofagite: 'A', hernia: false, tamHernia: 3,
+        esofagite: false, grauEsofagite: 'A', hernia: false, anatomicoId: 'teg_alinhada', tamHernia: 40,
         varizes: false, varizesCalibre: 'fino', varizesRedSpots: false,
         barrett: false, barrettC: 0, barrettM: 0, eosinofilica: false,
         candida: false, candidaKodsi: 'I', estenose: false, ulcera: false,
@@ -491,10 +743,15 @@ export default function EndoReport() {
         celAtrofia: false, celMosaico: false, celSerrilhado: false, diverticulo: false
       });
       setAiMode(false);
+      setHasManualEdits(false);
     }
   };
 
   const wordCount = report.trim().split(/\s+/).length;
+
+  const esophagusTemplates = templates?.filter(t => t.category === 'Esôfago' || t.category === 'Geral') || [];
+  const stomachTemplates = templates?.filter(t => t.category === 'Estômago' || t.category === 'Geral') || [];
+  const duodenumTemplates = templates?.filter(t => t.category === 'Duodeno' || t.category === 'Geral') || [];
 
   return (
     <TooltipProvider>
@@ -532,6 +789,10 @@ export default function EndoReport() {
                   <Trash2 className="w-4 h-4 group-hover:scale-110 transition-transform" />
                   <span className="hidden sm:inline">Novo</span>
                 </button>
+                <Button variant="ghost" size="sm" onClick={logout} className="gap-2 text-slate-500 hover:text-red-600">
+                  <LogOut className="w-4 h-4" />
+                  <span className="hidden sm:inline">Sair</span>
+                </Button>
               </div>
             </div>
 
@@ -577,21 +838,27 @@ export default function EndoReport() {
                 isNormal={esoNormal}
                 setIsNormal={setEsoNormal}
                 data={esoData}
-                setData={setEsoData} />
+                setData={setEsoData}
+                templates={esophagusTemplates}
+                onApplyTemplate={(content) => handleApplyTemplate('esophagus', content)} />
               
 
               <StomachSection
                 isNormal={estoNormal}
                 setIsNormal={setEstoNormal}
                 data={estoData}
-                setData={setEstoData} />
+                setData={setEstoData}
+                templates={stomachTemplates}
+                onApplyTemplate={(content) => handleApplyTemplate('stomach', content)} />
               
 
               <DuodenumSection
                 isNormal={duoNormal}
                 setIsNormal={setDuoNormal}
                 data={duoData}
-                setData={setDuoData} />
+                setData={setDuoData}
+                templates={duodenumTemplates}
+                onApplyTemplate={(content) => handleApplyTemplate('duodenum', content)} />
               
 
               <div className="h-24" />
@@ -613,7 +880,8 @@ export default function EndoReport() {
             showBiopsyButton={checkBiopsyNeeded()}
             onSaveReport={handleSaveReport}
             saving={saving}
-            hasPatient={!!selectedPatient} />
+            hasPatient={!!selectedPatient}
+            onReportChange={handleReportChange} />
           
         </div>
 

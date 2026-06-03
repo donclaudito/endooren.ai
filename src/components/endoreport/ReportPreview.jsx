@@ -1,8 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { Sparkles, Copy, Check, RotateCcw, Microscope, Save, Pencil, LockKeyhole } from 'lucide-react';
+import { Sparkles, Copy, Check, RotateCcw, Microscope, Save } from 'lucide-react';
 import { motion } from 'framer-motion';
 
 export default function ReportPreview({
@@ -17,54 +17,32 @@ export default function ReportPreview({
   showBiopsyButton,
   onSaveReport,
   saving,
-  hasPatient
+  hasPatient,
+  onReportChange
 }) {
-  const [editMode, setEditMode] = useState(false);
-  const [editedReport, setEditedReport] = useState(report);
-  const [hasManualEdits, setHasManualEdits] = useState(false);
-
-  // Only sync from parent when there are NO manual edits (user hasn't edited yet)
-  useEffect(() => {
-    if (!hasManualEdits) {
-      setEditedReport(report);
-    }
-  }, [report]);
-
-  const handleToggleEdit = () => {
-    if (editMode) {
-      // Confirm: lock edits, mark as manually edited so parent changes don't overwrite
-      setHasManualEdits(true);
-      setEditMode(false);
-    } else {
-      setEditMode(true);
-    }
-  };
-
   const handleCopy = () => {
-    navigator.clipboard.writeText(editedReport);
+    navigator.clipboard.writeText(report);
     onCopy();
   };
 
-  const displayReport = editedReport;
-  const displayWordCount = displayReport.trim().split(/\s+/).length;
+  const displayReport = report || '';
+  const displayWordCount = displayReport.trim().split(/\s+/).filter(Boolean).length;
 
   return (
-    <div className={`bg-white w-full max-w-3xl h-full max-h-[90vh] shadow-xl rounded-xl flex flex-col overflow-hidden relative transition-all duration-300 ${aiMode ? 'ring-2 ring-indigo-500 shadow-indigo-100' : ''} ${editMode ? 'ring-2 ring-amber-400 shadow-amber-100' : ''}`}>
+    <div className={`bg-white w-full max-w-3xl h-full max-h-[90vh] shadow-xl rounded-xl flex flex-col overflow-hidden relative transition-all duration-300 ${aiMode ? 'ring-2 ring-indigo-500 shadow-indigo-100' : ''}`}>
       
       {/* Toolbar */}
-      <div className={`${editMode ? 'bg-amber-700' : 'bg-slate-800'} text-slate-100 px-4 py-3 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 z-10 shadow-md transition-colors duration-300`}>
+      <div className="bg-slate-800 text-slate-100 px-4 py-3 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 z-10 shadow-md">
         <div className="flex items-center gap-2">
           <span className="font-semibold text-sm tracking-wide">Laudo Gerado</span>
-          {aiMode && !editMode && (
+          {aiMode && (
             <Badge className="bg-indigo-500 text-white text-[10px] font-bold px-2 py-0.5 animate-pulse">
               IA ATIVA
             </Badge>
           )}
-          {editMode && (
-            <Badge className="bg-amber-400 text-amber-900 text-[10px] font-bold px-2 py-0.5 animate-pulse">
-              EDITANDO
-            </Badge>
-          )}
+          <Badge className="bg-slate-600 text-slate-200 text-[10px] font-medium px-2 py-0.5">
+            EDITÁVEL
+          </Badge>
         </div>
         <div className="flex gap-2 flex-wrap">
           {showBiopsyButton && (
@@ -88,48 +66,24 @@ export default function ReportPreview({
             <span className="hidden sm:inline">{saving ? 'Salvando...' : 'Salvar'}</span>
           </Button>
 
-          {/* Edit / Lock button */}
           <Button
-            onClick={handleToggleEdit}
+            onClick={onToggleAI}
             size="sm"
-            className={editMode
-              ? "bg-amber-400 hover:bg-amber-300 text-amber-900 font-bold"
-              : "bg-sky-600 hover:bg-sky-500 text-white"}
-            title={editMode ? "Confirmar edições e bloquear" : "Editar laudo manualmente"}
+            variant={aiMode ? "secondary" : "default"}
+            className={aiMode ? "bg-slate-600 hover:bg-slate-500" : "bg-indigo-600 hover:bg-indigo-500"}
           >
-            {editMode ? (
+            {aiMode ? (
               <>
-                <LockKeyhole className="w-4 h-4 mr-1" />
-                <span className="hidden sm:inline">Confirmar</span>
+                <RotateCcw className="w-4 h-4 mr-1" />
+                <span className="hidden sm:inline">Resetar</span>
               </>
             ) : (
               <>
-                <Pencil className="w-4 h-4 mr-1" />
-                <span className="hidden sm:inline">Editar</span>
+                <Sparkles className="w-4 h-4 mr-1" />
+                <span className="hidden sm:inline">Modo IA</span>
               </>
             )}
           </Button>
-
-          {!editMode && (
-            <Button
-              onClick={onToggleAI}
-              size="sm"
-              variant={aiMode ? "secondary" : "default"}
-              className={aiMode ? "bg-slate-600 hover:bg-slate-500" : "bg-indigo-600 hover:bg-indigo-500"}
-            >
-              {aiMode ? (
-                <>
-                  <RotateCcw className="w-4 h-4 mr-1" />
-                  <span className="hidden sm:inline">Resetar</span>
-                </>
-              ) : (
-                <>
-                  <Sparkles className="w-4 h-4 mr-1" />
-                  <span className="hidden sm:inline">Modo IA</span>
-                </>
-              )}
-            </Button>
-          )}
 
           <Button
             onClick={handleCopy}
@@ -151,26 +105,11 @@ export default function ReportPreview({
         </div>
       </div>
 
-      {/* Edit Mode Banner */}
-      {editMode && (
-        <motion.div
-          initial={{ opacity: 0, y: -8 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="bg-amber-50 border-b border-amber-200 px-4 py-2 flex items-center gap-2"
-        >
-          <Pencil className="w-3.5 h-3.5 text-amber-600 flex-shrink-0" />
-          <p className="text-xs text-amber-700 font-medium">
-            Modo de edição ativo — faça as alterações necessárias no laudo. Clique em <strong>Confirmar</strong> para salvar as edições.
-          </p>
-        </motion.div>
-      )}
-
       {/* Report Text */}
       <Textarea
-        value={editedReport}
-        readOnly={!editMode}
-        onChange={(e) => editMode && setEditedReport(e.target.value)}
-        className={`w-full h-full p-6 text-sm font-mono leading-relaxed text-slate-700 resize-none outline-none border-0 focus:ring-0 focus-visible:ring-0 transition-colors duration-200 ${editMode ? 'bg-amber-50/40 cursor-text' : 'bg-white cursor-default'}`}
+        value={displayReport}
+        onChange={(e) => onReportChange(e.target.value)}
+        className="w-full h-full p-6 text-sm font-mono leading-relaxed text-slate-700 resize-none outline-none border-0 focus:ring-0 focus-visible:ring-0 transition-colors duration-200 bg-white cursor-text"
         spellCheck={false}
       />
 

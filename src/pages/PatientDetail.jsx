@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { base44 } from '@/api/base44Client';
+import { apiClient } from '@/services/apiClient';
 import { useQuery } from '@tanstack/react-query';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -23,16 +23,13 @@ export default function PatientDetailPage() {
 
   const { data: patient, isLoading: patientLoading } = useQuery({
     queryKey: ['patient', patientId],
-    queryFn: async () => {
-      const results = await base44.entities.Patient.filter({ id: patientId });
-      return results[0] || null;
-    },
+    queryFn: () => apiClient.get(`/api/patients?id=${patientId}`),
     enabled: !!patientId
   });
 
   const { data: reports = [], isLoading: reportsLoading } = useQuery({
     queryKey: ['patient-reports', patientId],
-    queryFn: () => base44.entities.Report.filter({ patient_id: patientId }, '-created_date'),
+    queryFn: () => apiClient.get(`/api/exames?patient_id=${patientId}`),
     enabled: !!patientId
   });
 

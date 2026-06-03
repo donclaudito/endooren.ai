@@ -4,10 +4,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Checkbox } from "@/components/ui/checkbox";
 import { Switch } from "@/components/ui/switch";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { HelpCircle } from 'lucide-react';
+import { HelpCircle, FileText } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { ESOPHAGITIS_TYPES, getEsophagitisGrouped, ANATOMICAL_TYPES } from '@/utils/esophagitisDb';
 
-export default function EsophagusSection({ isNormal, setIsNormal, data, setData }) {
+export default function EsophagusSection({ isNormal, setIsNormal, data, setData, templates, onApplyTemplate }) {
   const updateData = (key, value) => {
     setData(prev => ({ ...prev, [key]: value }));
   };
@@ -31,6 +32,28 @@ export default function EsophagusSection({ isNormal, setIsNormal, data, setData 
           </span>
         </label>
       </div>
+
+      {/* Templates Selector */}
+      {templates && templates.length > 0 && (
+        <div className="px-4 lg:px-6 py-2 bg-slate-50 border-b border-slate-100 flex items-center justify-between gap-3">
+          <span className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
+            <FileText className="w-3.5 h-3.5 text-sky-600" />
+            Templates Rápidos
+          </span>
+          <Select onValueChange={(val) => onApplyTemplate(val)}>
+            <SelectTrigger className="w-[200px] h-8 bg-white border-slate-200 text-xs">
+              <SelectValue placeholder="Selecione..." />
+            </SelectTrigger>
+            <SelectContent>
+              {templates.map(t => (
+                <SelectItem key={t.id} value={t.content} className="text-xs">
+                  {t.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      )}
 
       {/* Options */}
       <AnimatePresence>
@@ -94,45 +117,175 @@ export default function EsophagusSection({ isNormal, setIsNormal, data, setData 
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4">
                 <div className="space-y-4">
-                  {/* Esofagite */}
-                  <div className="bg-slate-50 p-3 rounded-lg border border-slate-100">
-                    <label className="flex items-center space-x-2 mb-2 cursor-pointer">
-                      <Checkbox checked={data.esofagite} onCheckedChange={(v) => updateData('esofagite', v)} />
-                      <span className="font-medium text-sm">Esofagite (LA)</span>
-                    </label>
-                    <Select value={data.grauEsofagite} onValueChange={(v) => updateData('grauEsofagite', v)}>
-                      <SelectTrigger><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="A">Grau A</SelectItem>
-                        <SelectItem value="B">Grau B</SelectItem>
-                        <SelectItem value="C">Grau C</SelectItem>
-                        <SelectItem value="D">Grau D</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  {/* Hérnia */}
-                  <div className="bg-slate-50 p-3 rounded-lg border border-slate-100 flex items-center justify-between">
+                  {/* Esofagite Unificada */}
+                  <div className="bg-slate-50 p-3 rounded-lg border border-slate-100 space-y-3">
                     <label className="flex items-center space-x-2 cursor-pointer">
-                      <Checkbox checked={data.hernia} onCheckedChange={(v) => updateData('hernia', v)} />
-                      <span className="font-medium text-sm">Hérnia Hiatal</span>
-                    </label>
-                    <div className="flex items-center gap-2">
-                      <Input
-                        type="number"
-                        value={data.tamHernia}
-                        onChange={(e) => updateData('tamHernia', parseInt(e.target.value) || 0)}
-                        className="w-14 p-1 text-sm text-center"
+                      <Checkbox 
+                        checked={data.esofagite} 
+                        onCheckedChange={(v) => {
+                          updateData('esofagite', v);
+                          if (!v) {
+                            updateData('esofagiteId', '');
+                            updateData('esofagiteSubclassificacao', '');
+                            updateData('eosinofilica', false);
+                            updateData('candida', false);
+                          } else if (!data.esofagiteId) {
+                            updateData('esofagiteId', 'peptica_la_a');
+                            updateData('grauEsofagite', 'A');
+                          }
+                        }} 
                       />
-                      <span className="text-xs text-slate-500">cm</span>
-                    </div>
+                      <span className="font-bold text-sm text-slate-700">Esofagite</span>
+                    </label>
+                    
+                    {data.esofagite && (
+                      <div className="space-y-2 pt-1 border-t border-slate-200">
+                        <div>
+                          <label className="text-[10px] text-slate-500 font-semibold uppercase block mb-1">Tipo de Esofagite</label>
+                          <Select 
+                            value={data.esofagiteId || 'peptica_la_a'} 
+                            onValueChange={(v) => {
+                              updateData('esofagiteId', v);
+                              updateData('esofagiteSubclassificacao', '');
+                              
+                              // Sync traditional flags for backward compatibility
+                              if (v.startsWith('peptica_la_')) {
+                                updateData('grauEsofagite', v.split('_').pop().toUpperCase());
+                                updateData('eosinofilica', false);
+                                updateData('candida', false);
+                              } else if (v === 'imune_eosinofilica') {
+                                updateData('eosinofilica', true);
+                                updateData('candida', false);
+                              } else if (v.startsWith('candida_kodsi_')) {
+                                const kodsiRoman = v.split('_').pop() === '1' ? 'I' : v.split('_').pop() === '2' ? 'II' : v.split('_').pop() === '3' ? 'III' : 'IV';
+                                updateData('candida', true);
+                                updateData('candidaKodsi', kodsiRoman);
+                                updateData('eosinofilica', false);
+                              } else {
+                                updateData('eosinofilica', false);
+                                updateData('candida', false);
+                              }
+                            }}
+                          >
+                            <SelectTrigger className="bg-white"><SelectValue /></SelectTrigger>
+                            <SelectContent className="max-h-[250px]">
+                              {Object.entries(getEsophagitisGrouped()).map(([group, options]) => (
+                                <div key={group}>
+                                  <div className="px-2 py-1 text-[10px] font-bold text-slate-400 bg-slate-50 uppercase tracking-wider">{group}</div>
+                                  {options.map(opt => (
+                                    <SelectItem key={opt.id} value={opt.id} className="text-xs">{opt.nome}</SelectItem>
+                                  ))}
+                                </div>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+
+                        {/* Subclassificações (Zargar / EREFS) */}
+                        {(() => {
+                          const selected = ESOPHAGITIS_TYPES.find(t => t.id === (data.esofagiteId || 'peptica_la_a'));
+                          if (selected?.requerSubclassificacao) {
+                            if (selected.escoreSugerido === 'EREFS') {
+                              return (
+                                <div className="space-y-1">
+                                  <label className="text-[10px] text-sky-600 font-semibold uppercase block flex items-center gap-1">
+                                    Escore EREFS
+                                    <Tooltip>
+                                      <TooltipTrigger type="button"><HelpCircle className="w-3.5 h-3.5 text-sky-400" /></TooltipTrigger>
+                                      <TooltipContent className="max-w-xs bg-slate-800 text-white p-2 text-xs">
+                                        <p className="font-bold mb-1">Escore EREFS (Edema, Rings, Exudate, Furrows, Stricture)</p>
+                                        <p>Formato sugerido: Edema (0-2), Anéis (0-3), Exsudato (0-2), Sulcos (0-2), Estenose (0-1).</p>
+                                      </TooltipContent>
+                                    </Tooltip>
+                                  </label>
+                                  <Input 
+                                    placeholder="Ex: E2 R1 E1 F1 S0" 
+                                    value={data.esofagiteSubclassificacao || ''}
+                                    onChange={(e) => updateData('esofagiteSubclassificacao', e.target.value)}
+                                    className="bg-white text-xs h-8"
+                                  />
+                                </div>
+                              );
+                            } else if (selected.escoreSugerido === 'Zargar') {
+                              return (
+                                <div className="space-y-1">
+                                  <label className="text-[10px] text-orange-600 font-semibold uppercase block">Grau Zargar</label>
+                                  <Select 
+                                    value={data.esofagiteSubclassificacao || ''} 
+                                    onValueChange={(v) => updateData('esofagiteSubclassificacao', v)}
+                                  >
+                                    <SelectTrigger className="bg-white text-xs h-8"><SelectValue placeholder="Selecione o Grau" /></SelectTrigger>
+                                    <SelectContent>
+                                      <SelectItem value="Grau 0" className="text-xs">Grau 0: Normal</SelectItem>
+                                      <SelectItem value="Grau 1" className="text-xs">Grau 1: Edema e hiperemia</SelectItem>
+                                      <SelectItem value="Grau 2A" className="text-xs">Grau 2A: Ulcerações superficiais</SelectItem>
+                                      <SelectItem value="Grau 2B" className="text-xs">Grau 2B: Ulcerações profundas</SelectItem>
+                                      <SelectItem value="Grau 3A" className="text-xs">Grau 3A: Necrose focal</SelectItem>
+                                      <SelectItem value="Grau 3B" className="text-xs">Grau 3B: Necrose extensa</SelectItem>
+                                      <SelectItem value="Grau 4" className="text-xs">Grau 4: Perfuração</SelectItem>
+                                    </SelectContent>
+                                  </Select>
+                                </div>
+                              );
+                            }
+                          }
+                          return null;
+                        })()}
+                      </div>
+                    )}
                   </div>
 
-                  {/* Eosinofílica */}
-                  <label className="flex items-center space-x-2 p-2 hover:bg-slate-50 rounded cursor-pointer">
-                    <Checkbox checked={data.eosinofilica} onCheckedChange={(v) => updateData('eosinofilica', v)} />
-                    <span className="text-sm">Suspeita Esofagite Eosinofílica</span>
-                  </label>
+                  {/* Marcos Anatômicos / Diafragma */}
+                  <div className="bg-slate-50 p-3 rounded-lg border border-slate-100 space-y-3">
+                    <span className="font-bold text-xs text-slate-500 uppercase tracking-wider block">Transição & Diafragma</span>
+                    
+                    <div className="space-y-2">
+                      <Select 
+                        value={data.anatomicoId || 'teg_alinhada'} 
+                        onValueChange={(v) => {
+                          updateData('anatomicoId', v);
+                          if (v === 'teg_alinhada') {
+                            updateData('hernia', false);
+                            updateData('tamHernia', 40);
+                          } else if (v === 'hernia_deslizamento') {
+                            updateData('hernia', true);
+                            updateData('tamHernia', 3);
+                          }
+                        }}
+                      >
+                        <SelectTrigger className="bg-white text-xs h-9"><SelectValue placeholder="Estado da Transição" /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="teg_alinhada" className="text-xs">Transição Esofagogástrica Alinhada</SelectItem>
+                          <SelectItem value="hernia_deslizamento" className="text-xs">Hérnia Hiatal por Deslizamento</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    {/* Input de X para Alinhada ou Hérnia */}
+                    <div className="flex items-center justify-between bg-white p-2 rounded border border-slate-200">
+                      <span className="text-[10px] font-bold text-slate-500 uppercase">
+                        {(data.anatomicoId === 'hernia_deslizamento') ? 'Hérnia (cm)' : 'Prega diafr. (cm)'}
+                      </span>
+                      <div className="flex items-center gap-1">
+                        <Input
+                          type="number"
+                          value={data.tamHernia !== undefined ? data.tamHernia : (data.anatomicoId === 'hernia_deslizamento' ? 3 : 40)}
+                          onChange={(e) => updateData('tamHernia', parseInt(e.target.value) || 0)}
+                          className="w-16 p-1 text-sm text-center h-8"
+                        />
+                        <span className="text-xs text-slate-400">cm</span>
+                      </div>
+                    </div>
+
+                    {/* Hiato Laxo (Sinal do Capuz) */}
+                    <label className="flex items-center space-x-2 cursor-pointer pt-1 border-t border-slate-200">
+                      <Checkbox 
+                        checked={data.hiatoLaxo || false} 
+                        onCheckedChange={(v) => updateData('hiatoLaxo', v)} 
+                      />
+                      <span className="text-xs font-semibold text-slate-600">Hiato Diafragmático Laxo (Sinal do Capuz)</span>
+                    </label>
+                  </div>
                 </div>
 
                 <div className="space-y-4">
@@ -241,37 +394,6 @@ export default function EsophagusSection({ isNormal, setIsNormal, data, setData 
 
               {/* Other options */}
               <div className="pt-4 border-t border-slate-100 grid grid-cols-2 gap-3">
-                <div className="space-y-2">
-                  <label className="flex items-center space-x-2 cursor-pointer">
-                    <Checkbox checked={data.candida} onCheckedChange={(v) => updateData('candida', v)} />
-                    <span className="text-sm">Candidíase</span>
-                    <Tooltip>
-                      <TooltipTrigger>
-                        <HelpCircle className="w-3 h-3 text-sky-400 cursor-help" />
-                      </TooltipTrigger>
-                      <TooltipContent className="max-w-xs bg-slate-800 text-white">
-                        <p className="font-bold text-sky-300 mb-1">Classificação de Kodsi</p>
-                        <ul className="list-disc pl-4 text-xs space-y-1">
-                          <li><strong>I:</strong> Poucas placas brancas &lt; 2mm.</li>
-                          <li><strong>II:</strong> Múltiplas placas &gt; 2mm.</li>
-                          <li><strong>III:</strong> Placas confluentes.</li>
-                          <li><strong>IV:</strong> Estenose ou estreitamento.</li>
-                        </ul>
-                      </TooltipContent>
-                    </Tooltip>
-                  </label>
-                  {data.candida && (
-                    <Select value={data.candidaKodsi} onValueChange={(v) => updateData('candidaKodsi', v)}>
-                      <SelectTrigger className="text-xs"><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="I">Kodsi I</SelectItem>
-                        <SelectItem value="II">Kodsi II</SelectItem>
-                        <SelectItem value="III">Kodsi III</SelectItem>
-                        <SelectItem value="IV">Kodsi IV</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  )}
-                </div>
                 <label className="flex items-center space-x-2 cursor-pointer">
                   <Checkbox checked={data.estenose} onCheckedChange={(v) => updateData('estenose', v)} />
                   <span className="text-sm">Estenose</span>
