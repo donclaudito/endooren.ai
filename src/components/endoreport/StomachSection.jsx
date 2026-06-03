@@ -126,42 +126,51 @@ export default function StomachSection({ isNormal, setIsNormal, data, setData, t
 
               {/* Gastrite */}
               <div className="bg-slate-50 p-4 rounded-lg border border-slate-100">
-                <h3 className="text-xs font-bold text-slate-400 uppercase mb-3">Gastrite & Inflamação</h3>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                  <div>
-                    <span className="text-xs text-slate-500 block mb-1">Padrão</span>
-                    <Select value={data.gastriteTipo} onValueChange={(v) => updateData('gastriteTipo', v)}>
-                      <SelectTrigger><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="Enantematosa">Enantematosa</SelectItem>
-                        <SelectItem value="Erosiva Plana">Erosiva Plana</SelectItem>
-                        <SelectItem value="Erosiva Elevada">Erosiva Elevada</SelectItem>
-                      </SelectContent>
-                    </Select>
+                <label className="flex items-center space-x-2 mb-3 cursor-pointer">
+                  <Checkbox
+                    checked={data.gastrite}
+                    onCheckedChange={(v) => updateData('gastrite', v)}
+                    className="data-[state=checked]:bg-sky-600 data-[state=checked]:border-sky-600"
+                  />
+                  <h3 className="text-sm font-bold text-slate-700">Gastrite &amp; Inflamação</h3>
+                </label>
+                {data.gastrite && (
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3 ml-6">
+                    <div>
+                      <span className="text-xs text-slate-500 block mb-1">Padrão</span>
+                      <Select value={data.gastriteTipo} onValueChange={(v) => updateData('gastriteTipo', v)}>
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="Enantematosa">Enantematosa</SelectItem>
+                          <SelectItem value="Erosiva Plana">Erosiva Plana</SelectItem>
+                          <SelectItem value="Erosiva Elevada">Erosiva Elevada</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <span className="text-xs text-slate-500 block mb-1">Intensidade</span>
+                      <Select value={data.gastriteIntensidade} onValueChange={(v) => updateData('gastriteIntensidade', v)}>
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="Leve">Leve</SelectItem>
+                          <SelectItem value="Moderada">Moderada</SelectItem>
+                          <SelectItem value="Intensa">Intensa</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <span className="text-xs text-slate-500 block mb-1">Localização</span>
+                      <Select value={data.gastriteLocal} onValueChange={(v) => updateData('gastriteLocal', v)}>
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="Antro">Antro</SelectItem>
+                          <SelectItem value="Corpo">Corpo</SelectItem>
+                          <SelectItem value="Pangastrite">Pangastrite</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
                   </div>
-                  <div>
-                    <span className="text-xs text-slate-500 block mb-1">Intensidade</span>
-                    <Select value={data.gastriteIntensidade} onValueChange={(v) => updateData('gastriteIntensidade', v)}>
-                      <SelectTrigger><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="Leve">Leve</SelectItem>
-                        <SelectItem value="Moderada">Moderada</SelectItem>
-                        <SelectItem value="Intensa">Intensa</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div>
-                    <span className="text-xs text-slate-500 block mb-1">Localização</span>
-                    <Select value={data.gastriteLocal} onValueChange={(v) => updateData('gastriteLocal', v)}>
-                      <SelectTrigger><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="Antro">Antro</SelectItem>
-                        <SelectItem value="Corpo">Corpo</SelectItem>
-                        <SelectItem value="Pangastrite">Pangastrite</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
+                )}
               </div>
 
               {/* Atrofia */}

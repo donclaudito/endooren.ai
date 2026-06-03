@@ -22,10 +22,13 @@ import IdentificationSection from '@/components/endoreport/IdentificationSection
 import EsophagusSection from '@/components/endoreport/EsophagusSection';
 import StomachSection from '@/components/endoreport/StomachSection';
 import DuodenumSection from '@/components/endoreport/DuodenumSection';
+import ConclusionTemplates from '@/components/endoreport/ConclusionTemplates';
+import ProceduresSection from '@/components/endoreport/ProceduresSection';
 import ReportPreview from '@/components/endoreport/ReportPreview';
 import BiopsyModal from '@/components/endoreport/BiopsyModal';
 import PatientSelector from '@/components/endoreport/PatientSelector';
 import { getEsophagitisReport, getAnatomicalReport } from '@/utils/esophagitisDb';
+import { PROCEDURES, generateProcedureText } from '@/utils/proceduresDb';
 
 export default function EndoReport() {
   const urlParams = new URLSearchParams(window.location.search);
@@ -104,6 +107,7 @@ export default function EndoReport() {
     neoplasia: false,
     neoBorrmann: 'I',
     neoLocal: 'Antro',
+    gastrite: false,
     gastriteTipo: 'Enantematosa',
     gastriteIntensidade: 'Leve',
     gastriteLocal: 'Antro',
@@ -142,6 +146,10 @@ export default function EndoReport() {
   const [biopsyModalOpen, setBiopsyModalOpen] = useState(false);
   const [report, setReport] = useState('');
   const [saving, setSaving] = useState(false);
+  // Conclusion templates added as extra items
+  const [conclusionTemplates, setConclusionTemplates] = useState([]);
+  // Procedures performed during the exam
+  const [proceduresData, setProceduresData] = useState({});
 
   const queryClient = useQueryClient();
 
@@ -165,6 +173,7 @@ export default function EndoReport() {
       esophagus: '',
       stomach: '',
       duodenum: '',
+      procedures: '',
       conclusion: '',
       obs: '',
       signature: ''
@@ -176,6 +185,7 @@ export default function EndoReport() {
     const esoIdx = normalized.indexOf('ESÔFAGO:\n');
     const estoIdx = normalized.indexOf('ESTÔMAGO:\n');
     const duoIdx = normalized.indexOf('DUODENO:\n');
+    const procIdx = normalized.indexOf('PROCEDIMENTOS REALIZADOS:\n');
     const conclIdx = normalized.indexOf('----------------------------------\nCONCLUSÃO:\n');
     const obsIdx = normalized.indexOf('CONDUTA / OBS:\n');
     const sigIdx = normalized.indexOf('Assinado eletronicamente por:\n');
@@ -194,8 +204,13 @@ export default function EndoReport() {
     }
 
     if (duoIdx !== -1) {
-      const duoEnd = conclIdx !== -1 ? conclIdx : normalized.length;
+      const duoEnd = procIdx !== -1 ? procIdx : conclIdx !== -1 ? conclIdx : normalized.length;
       sections.duodenum = normalized.substring(duoIdx + 'DUODENO:\n'.length, duoEnd).trim();
+    }
+
+    if (procIdx !== -1) {
+      const procEnd = conclIdx !== -1 ? conclIdx : normalized.length;
+      sections.procedures = normalized.substring(procIdx + 'PROCEDIMENTOS REALIZADOS:\n'.length, procEnd).trim();
     }
 
     if (conclIdx !== -1) {
@@ -221,6 +236,11 @@ export default function EndoReport() {
     text += `ESÔFAGO:\n${sections.esophagus || ''}\n\n`;
     text += `ESTÔMAGO:\n${sections.stomach || ''}\n\n`;
     text += `DUODENO:\n${sections.duodenum || ''}\n\n`;
+    
+    if (sections.procedures) {
+      text += `PROCEDIMENTOS REALIZADOS:\n${sections.procedures}\n\n`;
+    }
+
     text += `----------------------------------\n`;
     text += `CONCLUSÃO:\n${sections.conclusion || ''}\n`;
     
@@ -233,6 +253,17 @@ export default function EndoReport() {
     }
     
     return text;
+  };
+
+  const generateProceduresText = () => {
+    const lines = [];
+    PROCEDURES.forEach(proc => {
+      const state = proceduresData[proc.id];
+      if (!state?.selected) return;
+      const text = generateProcedureText(proc, state);
+      if (text) lines.push(`- ${text}`);
+    });
+    return lines.join('\n');
   };
 
   const generateHeaderText = () => {
@@ -364,7 +395,7 @@ export default function EndoReport() {
         }
       }
 
-      if (!estoData.atrofia || (estoData.atrofia && estoData.gastriteTipo !== 'Enantematosa')) {
+      if (estoData.gastrite && (!estoData.atrofia || estoData.gastriteTipo !== 'Enantematosa')) {
         if (aiMode) {
           s_txt += `Mucosa de ${estoData.gastriteLocal} exibindo hiperemia difusa de padrão ${estoData.gastriteTipo.toLowerCase()}, de intensidade ${estoData.gastriteIntensidade.toLowerCase()}. `;
         } else {
@@ -476,7 +507,7 @@ export default function EndoReport() {
 
     if (!estoNormal) {
       if (estoData.neoplasia) conclusions.push(`Neoplasia Gástrica Avançada (Borrmann ${estoData.neoBorrmann}) de ${estoData.neoLocal}`);
-      if (!estoData.atrofia || (estoData.atrofia && estoData.gastriteTipo !== 'Enantematosa')) {
+      if (estoData.gastrite && (!estoData.atrofia || estoData.gastriteTipo !== 'Enantematosa')) {
         conclusions.push(`Gastrite ${estoData.gastriteTipo} ${estoData.gastriteIntensidade} de ${estoData.gastriteLocal}`);
       }
       if (estoData.atrofia) {
@@ -500,8 +531,14 @@ export default function EndoReport() {
       if (duoData.diverticulo) conclusions.push("Divertículo Duodenal Periampular");
     }
 
-    if (conclusions.length === 0) return "1. Exame dentro dos padrões da normalidade.";
-    return conclusions.map((c, i) => `${i + 1}. ${c}`).join('\n');
+    if (conclusions.length === 0 && conclusionTemplates.length === 0) return "1. Exame dentro dos padrões da normalidade.";
+
+    // Append conclusion templates after auto-generated conclusions
+    const allConclusions = [
+      ...conclusions,
+      ...conclusionTemplates.map(t => t.content)
+    ];
+    return allConclusions.map((c, i) => `${i + 1}. ${c}`).join('\n');
   };
 
   const generateObsText = () => {
@@ -531,11 +568,13 @@ export default function EndoReport() {
 
   const generateFullReport = (prefixes) => {
     const p = prefixes || { esophagus: '', stomach: '', duodenum: '' };
+    const procText = generateProceduresText();
     return buildReportFromSections({
       header: generateHeaderText(),
       esophagus: p.esophagus ? `${p.esophagus}\n${generateEsophagusText()}`.trim() : generateEsophagusText(),
       stomach: p.stomach ? `${p.stomach}\n${generateStomachText()}`.trim() : generateStomachText(),
       duodenum: p.duodenum ? `${p.duodenum}\n${generateDuodenumText()}`.trim() : generateDuodenumText(),
+      procedures: procText,
       conclusion: generateConclusionsText(),
       obs: generateObsText(),
       signature: `Assinado eletronicamente por:\n${doctorName} - ${doctorCrm}`
@@ -636,7 +675,8 @@ export default function EndoReport() {
 
       if (isChanged) {
         prevTemplatePrefixesRef.current = templatePrefixes;
-        // Conclusion always reflects all active checkboxes
+        // Conclusion, obs and procedures always reflect current state
+        sections.procedures = generateProceduresText();
         sections.conclusion = generateConclusionsText();
         sections.obs = generateObsText();
         setReport(buildReportFromSections(sections));
@@ -648,7 +688,7 @@ export default function EndoReport() {
     estoNormal, estoData,
     duoNormal, duoData,
     aiMode, doctorName, doctorCrm,
-    hasManualEdits, templatePrefixes
+    hasManualEdits, templatePrefixes, conclusionTemplates, proceduresData
   ]);
 
   const handleToggleAI = () => {
@@ -663,6 +703,8 @@ export default function EndoReport() {
       setAiMode(false);
       setHasManualEdits(false);
       setTemplatePrefixes({ esophagus: '', stomach: '', duodenum: '' });
+      setConclusionTemplates([]);
+      setProceduresData({});
       setReport('');
     }
   };
@@ -732,7 +774,7 @@ export default function EndoReport() {
       setEstoNormal(true);
       setEstoData({
         neoplasia: false, neoBorrmann: 'I', neoLocal: 'Antro',
-        gastriteTipo: 'Enantematosa', gastriteIntensidade: 'Leve', gastriteLocal: 'Antro',
+        gastrite: false, gastriteTipo: 'Enantematosa', gastriteIntensidade: 'Leve', gastriteLocal: 'Antro',
         atrofia: false, kimura: 'C-1', metaplasia: false, sydney: false,
         polipo: false, polipoLocal: 'Antro', polipoParis: '0-Ip', polipoTam: 4, polipoConduta: 'biopsia',
         subepitelial: false, urease: false, ureaseRes: 'Negativo', xantelasma: false, gave: false
@@ -744,6 +786,11 @@ export default function EndoReport() {
       });
       setAiMode(false);
       setHasManualEdits(false);
+      setTemplatePrefixes({ esophagus: '', stomach: '', duodenum: '' });
+      setConclusionTemplates([]);
+      setProceduresData({});
+      setReport('');
+      setSelectedPatient(null);
     }
   };
 
@@ -752,6 +799,26 @@ export default function EndoReport() {
   const esophagusTemplates = templates?.filter(t => t.category === 'Esôfago' || t.category === 'Geral') || [];
   const stomachTemplates = templates?.filter(t => t.category === 'Estômago' || t.category === 'Geral') || [];
   const duodenumTemplates = templates?.filter(t => t.category === 'Duodeno' || t.category === 'Geral') || [];
+  const conclusionTplList = templates?.filter(t => t.category === 'Conclusão') || [];
+
+  const handleApplyConclusion = (content, removeIdx) => {
+    setConclusionTemplates(prev => {
+      if (removeIdx !== undefined && removeIdx !== null) {
+        // Remove by index
+        return prev.filter((_, i) => i !== removeIdx);
+      }
+      // Find matching template name for display chip
+      const tpl = conclusionTplList.find(t => t.content === content);
+      const name = tpl ? tpl.name : `Conclusão ${prev.length + 1}`;
+      return [...prev, { name, content }];
+    });
+    setHasManualEdits(true);
+  };
+
+  const handleClearConclusions = () => {
+    setConclusionTemplates([]);
+    setHasManualEdits(true);
+  };
 
   return (
     <TooltipProvider>
@@ -860,6 +927,16 @@ export default function EndoReport() {
                 templates={duodenumTemplates}
                 onApplyTemplate={(content) => handleApplyTemplate('duodenum', content)} />
               
+
+              <ConclusionTemplates
+                templates={conclusionTplList}
+                activeTemplates={conclusionTemplates}
+                onApplyTemplate={handleApplyConclusion}
+                onClearTemplates={handleClearConclusions} />
+
+              <ProceduresSection
+                data={proceduresData}
+                setData={setProceduresData} />
 
               <div className="h-24" />
             </div>
