@@ -226,6 +226,8 @@ export default function Admin() {
                   onChange={(e) => setConfig({ ...config, model_name: e.target.value })}
                   className="w-full bg-slate-900 border border-slate-800 text-slate-100 rounded-lg p-2 text-sm outline-none focus:border-sky-500 transition-colors"
                 >
+                  <option value="open-mistral-7b">Mistral 7B (open-mistral-7b)</option>
+                  <option value="open-mixtral-8x22b">Mixtral 8x22B (open-mixtral-8x22b)</option>
                   <option value="mistral-small-2506">Mistral Small (mistral-small-2506)</option>
                   <option value="mistral-medium-latest">Mistral Medium (mistral-medium)</option>
                   <option value="gemini-1.5-flash">Gemini 1.5 Flash</option>
