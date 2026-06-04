@@ -1,4 +1,52 @@
 const { requireAuth } = require('./_lib/auth');
+const https = require('https');
+
+const postRequest = (urlStr, headers, bodyObj) => {
+  return new Promise((resolve, reject) => {
+    try {
+      const url = new URL(urlStr);
+      const postData = JSON.stringify(bodyObj);
+      const options = {
+        hostname: url.hostname,
+        path: url.pathname + url.search,
+        method: 'POST',
+        headers: {
+          ...headers,
+          'Content-Length': Buffer.byteLength(postData)
+        }
+      };
+
+      const req = https.request(options, (res) => {
+        let rawData = '';
+        res.setEncoding('utf8');
+        res.on('data', (chunk) => { rawData += chunk; });
+        res.on('end', () => {
+          resolve({
+            ok: res.statusCode >= 200 && res.statusCode < 300,
+            status: res.statusCode,
+            text: () => Promise.resolve(rawData),
+            json: () => {
+              try {
+                return Promise.resolve(JSON.parse(rawData));
+              } catch (e) {
+                return Promise.reject(new Error('Resposta do servidor inválida.'));
+              }
+            }
+          });
+        });
+      });
+
+      req.on('error', (e) => {
+        reject(e);
+      });
+
+      req.write(postData);
+      req.end();
+    } catch (err) {
+      reject(err);
+    }
+  });
+};
 
 const handler = async (req, res) => {
   if (req.method !== 'POST') {
@@ -27,13 +75,13 @@ const handler = async (req, res) => {
       "3. Seja extremamente formal, conciso e profissional, usando termos médicos adequados em português brasileiro.\n" +
       "4. Não reescreva o laudo inteiro. Forneça apenas uma lista estruturada de pontos críticos a serem revisados, se houver, ou parabenize a consistência do laudo se ele estiver clinicamente impecável e coerente.";
 
-    const response = await fetch('https://api.mistral.ai/v1/chat/completions', {
-      method: 'POST',
-      headers: {
+    const response = await postRequest(
+      'https://api.mistral.ai/v1/chat/completions',
+      {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${apiKey}`
       },
-      body: JSON.stringify({
+      {
         model: 'mistral-small-2506',
         messages: [
           {
@@ -46,8 +94,8 @@ const handler = async (req, res) => {
           }
         ],
         temperature: 0.2
-      })
-    });
+      }
+    );
 
     if (!response.ok) {
       const errText = await response.text();
@@ -68,7 +116,7 @@ const handler = async (req, res) => {
     return res.status(200).json({ analysis });
   } catch (error) {
     console.error('Error in analyze-report:', error);
-    return res.status(500).json({ error: 'Erro interno ao processar a análise do laudo.' });
+    return res.status(500).json({ error: `Erro interno ao processar a análise do laudo: ${error.message || error}` });
   }
 };
 
