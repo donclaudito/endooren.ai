@@ -10,9 +10,9 @@ const handler = async (req, res) => {
     return res.status(400).json({ error: 'O conteúdo do laudo é obrigatório.' });
   }
 
-  const apiKey = process.env.GEMINI_API_KEY;
+  const apiKey = process.env.MISTRAL_API_KEY || 'apihOeeiSO9oq8pNv67EI8j1gRYPG0Ej4CP';
   if (!apiKey) {
-    return res.status(500).json({ error: 'Chave de API do Gemini não configurada no servidor.' });
+    return res.status(500).json({ error: 'Chave de API do Mistral não configurada no servidor.' });
   }
 
   try {
@@ -27,44 +27,36 @@ const handler = async (req, res) => {
       "3. Seja extremamente formal, conciso e profissional, usando termos médicos adequados em português brasileiro.\n" +
       "4. Não reescreva o laudo inteiro. Forneça apenas uma lista estruturada de pontos críticos a serem revisados, se houver, ou parabenize a consistência do laudo se ele estiver clinicamente impecável e coerente.";
 
-    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
+    const response = await fetch('https://api.mistral.ai/v1/chat/completions', {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json'
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`
       },
       body: JSON.stringify({
-        contents: [
+        model: 'mistral-small-2506',
+        messages: [
+          {
+            role: 'system',
+            content: systemInstruction
+          },
           {
             role: 'user',
-            parts: [
-              {
-                text: `Analise o seguinte laudo de endoscopia e forneça seu parecer clínico:\n\n${report}`
-              }
-            ]
+            content: `Analise o seguinte laudo de endoscopia e forneça seu parecer clínico:\n\n${report}`
           }
         ],
-        systemInstruction: {
-          parts: [
-            {
-              text: systemInstruction
-            }
-          ]
-        },
-        generationConfig: {
-          temperature: 0.2,
-          maxOutputTokens: 2048
-        }
+        temperature: 0.2
       })
     });
 
     if (!response.ok) {
       const errText = await response.text();
-      console.error('Gemini API error response:', errText);
-      return res.status(502).json({ error: 'Erro ao comunicar com a API do Gemini.' });
+      console.error('Mistral API error response:', errText);
+      return res.status(502).json({ error: 'Erro ao comunicar com a API do Mistral.' });
     }
 
     const data = await response.json();
-    const analysis = data.candidates?.[0]?.content?.parts?.[0]?.text || 'Nenhuma resposta gerada.';
+    const analysis = data.choices?.[0]?.message?.content || 'Nenhuma resposta gerada.';
 
     return res.status(200).json({ analysis });
   } catch (error) {
@@ -74,3 +66,4 @@ const handler = async (req, res) => {
 };
 
 module.exports = requireAuth(handler);
+
