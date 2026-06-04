@@ -52,7 +52,14 @@ const handler = async (req, res) => {
     if (!response.ok) {
       const errText = await response.text();
       console.error('Mistral API error response:', errText);
-      return res.status(502).json({ error: 'Erro ao comunicar com a API do Mistral.' });
+      let parsedError = errText;
+      try {
+        const jsonErr = JSON.parse(errText);
+        parsedError = jsonErr.message || jsonErr.error?.message || errText;
+      } catch (e) {}
+      return res.status(502).json({ 
+        error: `Erro ao comunicar com a API do Mistral (Status ${response.status}): ${parsedError}`
+      });
     }
 
     const data = await response.json();
