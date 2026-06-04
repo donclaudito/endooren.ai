@@ -13,7 +13,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import {
   Stethoscope, User, Trash2, Sparkles, Copy, Check, RotateCcw,
-  Microscope, Printer, FileText, HelpCircle, Bell, X, Settings, Users, LogOut } from
+  Microscope, Printer, FileText, HelpCircle, Bell, X, Settings, Users, LogOut, Hammer } from
 'lucide-react';
 import { Link } from 'react-router-dom';
 import { createPageUrl } from '../utils';
@@ -837,6 +837,14 @@ export default function EndoReport() {
                 <p className="text-sm text-slate-500 font-medium ml-1 mt-1"></p>
               </div>
               <div className="flex items-center gap-2 flex-wrap">
+                {user?.email === 'clauorenstein@gmail.com' && (
+                  <Link to={createPageUrl('Admin')}>
+                    <Button variant="ghost" size="sm" className="gap-2 text-sky-600 hover:text-sky-700 hover:bg-sky-50 font-semibold">
+                      <Hammer className="w-4 h-4" />
+                      <span className="hidden sm:inline">Admin</span>
+                    </Button>
+                  </Link>
+                )}
                 <Link to={createPageUrl('Patients')}>
                   <Button variant="ghost" size="sm" className="gap-2 text-slate-500 hover:text-slate-700">
                     <Users className="w-4 h-4" />
