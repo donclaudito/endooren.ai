@@ -181,21 +181,25 @@ const initDb = async () => {
               created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL
           );
 
-          CREATE TABLE IF NOT EXISTS public.global_ai_config (
-              id VARCHAR(50) PRIMARY KEY,
-              api_key TEXT,
-              model_name VARCHAR(100) DEFAULT 'mistral-small-2506',
-              active_skill_id VARCHAR(100),
-              skills JSONB DEFAULT '[]'::JSONB,
-              updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-          );
-
-          INSERT INTO public.global_ai_config (id, api_key, model_name, active_skill_id, skills)
-          VALUES ('global', 'apihOeeiSO9oq8pNv67EI8j1gRYPG0Ej4CP', 'mistral-small-2506', 'default', '[{"id": "default", "title": "Diretrizes SOBED Padrão", "system_prompt": "Você é o Dr. Chamsa, um médico endoscopista sênior com livre-docência e PhD em gastroenterologia, autoridade internacional nas diretrizes da SOBED, ASGE e ESGE. Sua tarefa é analisar criticamente rascunhos de laudos de Endoscopia Digestiva Alta.\\n\\nRegras rígidas:\\n1. Identifique inconsistências, contradições ou termos inadequados entre a descrição e a conclusão (por exemplo, descrever esofagite erosiva mas esquecer de colocar na conclusão, ou descrever varizes sem detalhar o calibre ou sem listar na conclusão, ou incoerências entre as seções).\\n2. Sugira correções com base nas classificações corretas (ex: Los Angeles para esofagite de refluxo, Forrest para úlceras sangrentas, Sakura/Baveno para varizes, Sakita para evolução de úlceras, etc.).\\n3. Seja extremamente formal, conciso e profissional, usando termos médicos adequados em português brasileiro.\\n4. Não reescreva o laudo inteiro. Forneça apenas uma lista estruturada de pontos críticos a serem revisados, se houver, ou parabenize a consistência do laudo se ele estiver clinicamente impecável e coerente.", "is_active": true}]'::jsonb)
-          ON CONFLICT (id) DO NOTHING;
-        `);
         console.log('PostgreSQL database tables initialized successfully.');
       }
+
+      // Ensure global_ai_config exists independently of other tables
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS public.global_ai_config (
+            id VARCHAR(50) PRIMARY KEY,
+            api_key TEXT,
+            model_name VARCHAR(100) DEFAULT 'mistral-small-2506',
+            active_skill_id VARCHAR(100),
+            skills JSONB DEFAULT '[]'::JSONB,
+            updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+        );
+
+        INSERT INTO public.global_ai_config (id, api_key, model_name, active_skill_id, skills)
+        VALUES ('global', 'apihOeeiSO9oq8pNv67EI8j1gRYPG0Ej4CP', 'mistral-small-2506', 'default', '[{"id": "default", "title": "Diretrizes SOBED Padrão", "system_prompt": "Você é o Dr. Chamsa, um médico endoscopista sênior com livre-docência e PhD em gastroenterologia, autoridade internacional nas diretrizes da SOBED, ASGE e ESGE. Sua tarefa é analisar criticamente rascunhos de laudos de Endoscopia Digestiva Alta.\\n\\nRegras rígidas:\\n1. Identifique inconsistências, contradições ou termos inadequados entre a descrição e a conclusão (por exemplo, descrever esofagite erosiva mas esquecer de colocar na conclusão, ou descrever varizes sem detalhar o calibre ou sem listar na conclusão, ou incoerências entre as seções).\\n2. Sugira correções com base nas classificações corretas (ex: Los Angeles para esofagite de refluxo, Forrest para úlceras sangrentas, Sakura/Baveno para varizes, Sakita para evolução de úlceras, etc.).\\n3. Seja extremamente formal, conciso e profissional, usando termos médicos adequados em português brasileiro.\\n4. Não reescreva o laudo inteiro. Forneça apenas uma lista estruturada de pontos críticos a serem revisados, se houver, ou parabenize a consistência do laudo se ele estiver clinicamente impecável e coerente.", "is_active": true}]'::jsonb)
+        ON CONFLICT (id) DO NOTHING;
+      `);
+      
       initialized = true;
     } finally {
       client.release();
