@@ -180,7 +180,7 @@ const initDb = async () => {
               medico_id UUID REFERENCES public.medicos(id) ON DELETE CASCADE NOT NULL,
               created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL
           );
-
+        `);
         console.log('PostgreSQL database tables initialized successfully.');
       }
 
@@ -205,7 +205,7 @@ const initDb = async () => {
 
       await client.query(`
         INSERT INTO public.global_ai_config (id, api_key, model_name, active_skill_id, skills)
-        VALUES ($1, $2, $3, $4, $5)
+        VALUES ($1, $2, $3, $4, $5::jsonb)
         ON CONFLICT (id) DO NOTHING;
       `, ['global', 'apihOeeiSO9oq8pNv67EI8j1gRYPG0Ej4CP', 'mistral-small-2506', 'default', JSON.stringify(defaultSkills)]);
       
