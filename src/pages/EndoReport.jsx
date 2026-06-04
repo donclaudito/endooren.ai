@@ -34,7 +34,7 @@ export default function EndoReport() {
   const urlParams = new URLSearchParams(window.location.search);
   const patientIdFromUrl = urlParams.get('patient_id');
 
-  const { logout } = useAuth();
+  const { user, logout } = useAuth();
 
   // Fetch settings
   const { data: settings } = useQuery({
