@@ -1,0 +1,51 @@
+{
+  "name": "Settings",
+  "type": "object",
+  "properties": {
+    "doctor_name": {
+      "type": "string",
+      "description": "Nome do m\u00e9dico"
+    },
+    "doctor_crm": {
+      "type": "string",
+      "description": "CRM do m\u00e9dico"
+    },
+    "custom_indications": {
+      "type": "array",
+      "description": "Indica\u00e7\u00f5es cl\u00ednicas customizadas",
+      "items": {
+        "type": "object",
+        "properties": {
+          "value": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          },
+          "group": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "custom_templates": {
+      "type": "array",
+      "description": "Templates e frases predefinidas",
+      "items": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "category": {
+            "type": "string"
+          },
+          "content": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  },
+  "required": []
+}

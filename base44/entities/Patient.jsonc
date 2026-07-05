@@ -1,0 +1,42 @@
+{
+  "name": "Patient",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "Nome completo do paciente"
+    },
+    "birth_date": {
+      "type": "string",
+      "format": "date",
+      "description": "Data de nascimento"
+    },
+    "cpf": {
+      "type": "string",
+      "description": "CPF do paciente"
+    },
+    "phone": {
+      "type": "string",
+      "description": "Telefone de contato"
+    },
+    "email": {
+      "type": "string",
+      "description": "Email do paciente"
+    },
+    "medical_history": {
+      "type": "string",
+      "description": "Hist\u00f3rico m\u00e9dico relevante"
+    },
+    "allergies": {
+      "type": "string",
+      "description": "Alergias conhecidas"
+    },
+    "current_medications": {
+      "type": "string",
+      "description": "Medicamentos em uso"
+    }
+  },
+  "required": [
+    "name"
+  ]
+}

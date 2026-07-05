@@ -1,0 +1,57 @@
+{
+  "name": "Report",
+  "type": "object",
+  "properties": {
+    "patient_id": {
+      "type": "string",
+      "description": "ID do paciente associado"
+    },
+    "patient_name": {
+      "type": "string",
+      "description": "Nome do paciente (cache)"
+    },
+    "indication": {
+      "type": "string",
+      "description": "Indica\u00e7\u00e3o cl\u00ednica"
+    },
+    "report_content": {
+      "type": "string",
+      "description": "Conte\u00fado completo do laudo"
+    },
+    "exam_date": {
+      "type": "string",
+      "format": "date",
+      "description": "Data do exame"
+    },
+    "findings": {
+      "type": "object",
+      "description": "Achados estruturados do exame",
+      "properties": {
+        "esophagus": {
+          "type": "object"
+        },
+        "stomach": {
+          "type": "object"
+        },
+        "duodenum": {
+          "type": "object"
+        }
+      }
+    },
+    "conclusions": {
+      "type": "array",
+      "description": "Lista de conclus\u00f5es",
+      "items": {
+        "type": "string"
+      }
+    },
+    "biopsy_requested": {
+      "type": "boolean",
+      "description": "Se foi solicitada bi\u00f3psia"
+    }
+  },
+  "required": [
+    "patient_id",
+    "report_content"
+  ]
+}

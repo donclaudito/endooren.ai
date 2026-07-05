@@ -38,14 +38,14 @@ export default function Admin() {
   const [newSkillPrompt, setNewSkillPrompt] = useState('');
   const [editingSkillId, setEditingSkillId] = useState(null);
 
+  useEffect(() => {
+    fetchAdminConfig();
+  }, []);
+
   // Authentication gate
   if (!user || user.email !== 'clauorenstein@gmail.com') {
     return <Navigate to="/" replace />;
   }
-
-  useEffect(() => {
-    fetchAdminConfig();
-  }, []);
 
   const fetchAdminConfig = async () => {
     setLoading(true);
